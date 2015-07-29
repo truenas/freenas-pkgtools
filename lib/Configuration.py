@@ -544,6 +544,7 @@ class Configuration(object):
 
         license_data = None
         try:
+            from freenasUI.support.utils import LICENSE_FILE
             if os.path.exists(LICENSE_FILE):
                 license_data = open(LICENSE_FILE, "r").read().rstrip()
         except:
