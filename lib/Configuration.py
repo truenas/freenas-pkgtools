@@ -543,12 +543,11 @@ class Configuration(object):
             host_id = None
 
         license_data = None
-        try:
-            from freenasUI.support.utils import LICENSE_FILE
-            if os.path.exists(LICENSE_FILE):
-                license_data = open(LICENSE_FILE, "r").read().rstrip()
-        except:
-            pass
+        # try:
+        #     if os.path.exists(LICENSE_FILE):
+        #         license_data = open(LICENSE_FILE, "r").read().rstrip()
+        # except:
+        #     pass
 
         try:
             https_handler = VerifiedHTTPSHandler(ca_certs = DEFAULT_CA_FILE)
