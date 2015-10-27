@@ -71,16 +71,16 @@ def usage():
     sys.exit(1)
 
 SCRIPTS = [
-	"pre-install",
-	"post-install",
-	"install",
-	"pre-deinstall",
-	"post-deinstall",
-	"deinstall",
-	"pre-upgrade",
-	"post-upgrade",
-	"upgrade"
-]             
+    "pre-install",
+    "post-install",
+    "install",
+    "pre-deinstall",
+    "post-deinstall",
+    "deinstall",
+    "pre-upgrade",
+    "post-upgrade",
+    "upgrade"
+]
 
 def ProcessFileList(files, cfg_file):
     cfg_dir = os.path.dirname(cfg_file)
@@ -177,33 +177,33 @@ def LoadTemplate(path):
     try:
         cfp.read(cfg_file)
     except:
-	return rv
+        return rv
 
     if cfp.has_section("Package"):
-	# Get the various manifest settings
-	for key in ["name", "www", "arch", "maintainer",
-		"comment", "origin", "prefix", "licenslogic",
-		"licenses", "desc"]:
-	    if cfp.has_option("Package", key):
-		rv[key] = cfp.get("Package", key)
+        # Get the various manifest settings
+        for key in ["name", "www", "arch", "maintainer",
+                "comment", "origin", "prefix", "licenslogic",
+                "licenses", "desc"]:
+            if cfp.has_option("Package", key):
+                rv[key] = cfp.get("Package", key)
         # Some optional boolean values
         for key in ["requires-reboot"]:
             if cfp.has_option("Package", key):
                 rv[key] = cfp.getboolean("Package", key)
                 
     if cfp.has_section("Scripts"):
-	if "scripts" not in rv:
-	    rv["scripts"] = {}
-	for opt, val in cfp.items("Scripts"):
-	    if val.startswith("file:"):
-		# Skip over the file: part
-		fname = val[5:]
-		if fname.startswith("/") == False:
-		    fname = base_dir + "/" + fname
-		with open(fname, "r") as f:
-		    rv["scripts"][opt] = f.read()
-	    else:
-		rv["scripts"][opt] = val
+        if "scripts" not in rv:
+            rv["scripts"] = {}
+        for opt, val in cfp.items("Scripts"):
+            if val.startswith("file:"):
+                # Skip over the file: part
+                fname = val[5:]
+                if fname.startswith("/") == False:
+                    fname = base_dir + "/" + fname
+                with open(fname, "r") as f:
+                    rv["scripts"][opt] = f.read()
+            else:
+                rv["scripts"][opt] = val
 
     # Look for a list of services (and ones to restart)
     if cfp.has_section("Services"):
@@ -257,7 +257,7 @@ def main():
         for o, a in opts:
             if o == "-N":
                 arg_name = a
-	    elif o == "-T":
+            elif o == "-T":
                 arg_template = a
             elif o == "-V":
                 arg_version = a
