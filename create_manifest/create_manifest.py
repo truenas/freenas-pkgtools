@@ -28,8 +28,8 @@ verbose = 0
 #
         
 def usage():
-    print >> sys.stderr, "Usage: %s [-P package_directory] [-C configuration_file] [-o output_file] [-N <release_notes_file>] [-R release_name] -T <train_name> -S <manifest_version> pkg=version[:upgrade_from[,...]]  [...]" % sys.argv[0]
-    print >> sys.stderr, "\tMultiple -P options allowed; multiple pkg arguments allowed"
+    print("Usage: %s [-P package_directory] [-C configuration_file] [-o output_file] [-N <release_notes_file>] [-R release_name] -T <train_name> -S <manifest_version> pkg=version[:upgrade_from[,...]]  [...]" % sys.argv[0], file=sys.stderr)
+    print("\tMultiple -P options allowed; multiple pkg arguments allowed", file=sys.stderr)
     sys.exit(1)
 
 if __name__ == "__main__":
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     try:
         opts, args = getopt.getopt(sys.argv[1:], "P:C:N:R:T:S:o:t:qvd")
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         usage()
                 
     for o, a in opts:
@@ -117,7 +117,7 @@ if __name__ == "__main__":
             try:
                 services = pkg_json[PF.kPkgServicesKey]
             except:
-                print >> sys.stderr, "%s is not in pkg_json" % PF.kPkgServicesKey
+                print("%s is not in pkg_json" % PF.kPkgServicesKey, file=sys.stderr)
                 services = None
             try:
                 rr = pkg_json[PF.kPkgRebootKey]
@@ -131,23 +131,23 @@ if __name__ == "__main__":
                                     }
                               )
             if rr is not None:
-                print >> sys.stderr, "rr = %s" % rr
+                print("rr = %s" % rr, file=sys.stderr)
                 pkg.SetRequiresReboot(rr)
                 if rr is False:
                     # Let's see if we have any services which are restarted by default.
-                    print >> sys.stderr, "services = %s" % services
+                    print("services = %s" % services, file=sys.stderr)
                     if services and "Restart" in services:
                         # Services has two entries, we want the restart one
                         svcs = services["Restart"]
                         if len(svcs) > 0:
-                            print >> sys.stderr, "Restart Services = %s" % svcs.keys()
-                            pkg.SetRestartServices(svcs.keys())
+                            print("Restart Services = %s" % list(svcs.keys()), file=sys.stderr)
+                            pkg.SetRestartServices(list(svcs.keys()))
         else:
             # This is most likely due to the makefile not being updated, since I
             # changed how the command-line is constructed.  So we'll complain, and
             # then exit abnormally.
-            print >> sys.stderr, "I think you did not update the makefile"
-            print >> sys.stderr, "%s does not appear to be a valid file" % P
+            print("I think you did not update the makefile", file=sys.stderr)
+            print("%s does not appear to be a valid file" % P, file=sys.stderr)
             sys.exit(1)
 
         mani.AddPackage(pkg)
@@ -161,4 +161,4 @@ if __name__ == "__main__":
         outfile = open(outfile, "w")
             
     
-    print >>outfile, mani.String()
+    print(mani.String(), file=outfile)

@@ -35,8 +35,8 @@ import getopt
 import hashlib
 import json
 import tarfile
-import StringIO
-import ConfigParser
+import io
+import configparser
 
 CAT_KEY = "category"
 TYPE_KEY = "type"
@@ -104,19 +104,19 @@ def ChecksumFile(root, path):
         return None
 
 def usage():
-    print >> sys.stderr, "Usage: %s [-p pkg[,pkg...]] [-t file] [-N name] [-V version] [-O origin]" \
-        "[-M maintainer] [-D description] [-a] [-o dir] [-u] root [metalog]" % sys.argv[0]
-    print >> sys.stderr, "\t-t\ttemplate file"
-    print >> sys.stderr, "\t-p\tCategories/Packages to include (e.g., base, dev, kernel, crypto:ALL)"
-    print >> sys.stderr, "\t-o\tOutput location"
-    print >> sys.stderr, "\t-u\tInclude uncategorized entries"
-    print >> sys.stderr, "\t-l\tList categories in metafile, and exit."
-    print >> sys.stderr, "\t-N name\tPackage name"
-    print >> sys.stderr, "\t-V version\tPackage Version"
-    print >> sys.stderr, "\t-M maintainer\tPackage maintainer"
-    print >> sys.stderr, "\t-C comment\tPackage comment"
-    print >> sys.stderr, "\t-D desc\tPackage description"
-    print >> sys.stderr, "\t-O origin\tPackage origin (e.g., system/os)"
+    print("Usage: %s [-p pkg[,pkg...]] [-t file] [-N name] [-V version] [-O origin]" \
+        "[-M maintainer] [-D description] [-a] [-o dir] [-u] root [metalog]" % sys.argv[0], file=sys.stderr)
+    print("\t-t\ttemplate file", file=sys.stderr)
+    print("\t-p\tCategories/Packages to include (e.g., base, dev, kernel, crypto:ALL)", file=sys.stderr)
+    print("\t-o\tOutput location", file=sys.stderr)
+    print("\t-u\tInclude uncategorized entries", file=sys.stderr)
+    print("\t-l\tList categories in metafile, and exit.", file=sys.stderr)
+    print("\t-N name\tPackage name", file=sys.stderr)
+    print("\t-V version\tPackage Version", file=sys.stderr)
+    print("\t-M maintainer\tPackage maintainer", file=sys.stderr)
+    print("\t-C comment\tPackage comment", file=sys.stderr)
+    print("\t-D desc\tPackage description", file=sys.stderr)
+    print("\t-O origin\tPackage origin (e.g., system/os)", file=sys.stderr)
     sys.exit(1)
 
 def TemplateFiles(path):
@@ -140,7 +140,7 @@ def TemplateFiles(path):
         base_dir = os.path.dirname(path)
         cfg_file = path
 
-    cfp = ConfigParser.ConfigParser()
+    cfp = configparser.ConfigParser()
     try:
         cfp.read(cfg_file)
     except:
@@ -186,7 +186,7 @@ def LoadTemplate(path):
 	base_dir = os.path.dirname(path)
 	cfg_file = path
 
-    cfp = ConfigParser.ConfigParser()
+    cfp = configparser.ConfigParser()
     try:
 	cfp.read(cfg_file)
     except:
@@ -297,12 +297,12 @@ def FilterFunc(path, include_list, exclude_list):
             tmp = pattern
         # First, check to see if the name simply matches
         if path == tmp:
-            if debug: print >> sys.stderr, "Match: %s" % path
+            if debug: print("Match: %s" % path, file=sys.stderr)
             return True
         # Next, check to see if elem is a subset of it
         if path.startswith(tmp) and \
            path[len(tmp)] == "/":
-            if debug: print >> sys.stderr, "Match %s as child of %s" % (path, tmp)
+            if debug: print("Match %s as child of %s" % (path, tmp), file=sys.stderr)
             return True
         # Now to start using globbing.
         # fnmatch is awful, but let's try just that
@@ -310,7 +310,7 @@ def FilterFunc(path, include_list, exclude_list):
         # Thus, "/usr/*.cfg" matches both "/usr/foo.cfg" and
         # "/usr/local/etc/django.cfg".)
         if fnmatch.fnmatch(path, elem):
-            if debug: print >> sys.stderr, "Match: %s as glob match for %s" % (path, tmp)
+            if debug: print("Match: %s as glob match for %s" % (path, tmp), file=sys.stderr)
             return True
         return False
 
@@ -364,7 +364,7 @@ def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], "ap:o:udvlt:N:V:O:M:C:D:")
     except getopt.GetoptError as err:
-        print >>sys.stderr, str(err)
+        print(str(err), file=sys.stderr)
         usage()
         sys.exit(1)
 
@@ -401,28 +401,28 @@ def main():
     if template_file is not None:
         tdict = LoadTemplate(template_file)
         if tdict is not None:
-            for k in tdict.keys():
+            for k in list(tdict.keys()):
                 manifest[k] = tdict[k]
         filters = TemplateFiles(template_file)
         if filters is not None:
-            if debug > 1:  print >> sys.stderr, "Filter list = %s" % filters
+            if debug > 1:  print("Filter list = %s" % filters, file=sys.stderr)
             if len(filters["include"]) > 0:
                 include_list = filters["include"]
             if len(filters["exclude"]) > 0:
                 exclude_list = filters["exclude"]
 
     # Now we set any defaults that are left
-    for key in default_manifest_keys.keys():
+    for key in list(default_manifest_keys.keys()):
         if key not in manifest:
             manifest[key] = default_manifest_keys[key]
 
     # And a couple of special case ones (unless "-l" was given)
     if not list_cats:
         if "name" not in manifest:
-            print >> sys.stderr, "Package does not have a name.  Not acceptable"
+            print("Package does not have a name.  Not acceptable", file=sys.stderr)
             sys.exit(1)
         if "version" not in manifest:
-            print >> sys.stderr, "Package %s does not have a version.  Not acceptable!" % manifest["name"]
+            print("Package %s does not have a version.  Not acceptable!" % manifest["name"], file=sys.stderr)
             sys.exit(1)
 
         if "origin" not in manifest:
@@ -437,12 +437,12 @@ def main():
     elif len(args) == 1:
         # Assume this is a root
         if not os.path.isdir(args[0]):
-            print >> sys.stderr, "%s is not a directory and needs to be" % args[0]
+            print("%s is not a directory and needs to be" % args[0], file=sys.stderr)
             usage()
         root_path = args[0]
         metalog = root_path + "/METALOG"
         if not os.path.isfile(metalog):
-            print >> sys.stderr, "%s does not have a manifest file" % root_path
+            print("%s does not have a manifest file" % root_path, file=sys.stderr)
             usage
     elif len(args) == 2:
         # Check to see if one is a directory and the other is a file
@@ -473,24 +473,24 @@ def main():
 
             if fname in system:
                 if (CAT_KEY not in parms) and not (debug or uncat): continue
-                if verbose or debug: print >> sys.stderr, "Entry `%s' already in system... does that matter?" % fname
+                if verbose or debug: print("Entry `%s' already in system... does that matter?" % fname, file=sys.stderr)
                 if parms == system[fname]:
-                    if verbose or debug: print >> sys.stderr, "\tBut they are the same, so that's okay"
+                    if verbose or debug: print("\tBut they are the same, so that's okay", file=sys.stderr)
                 else:
-                    if verbose or debug: print >> sys.stderr, "\tTaking later entry as more valid"
+                    if verbose or debug: print("\tTaking later entry as more valid", file=sys.stderr)
                     del system[fname]
                     system[fname] = parms
             else:
                 system[fname] = parms
-    if debug: print "Done processing"
+    if debug: print("Done processing")
 
     if list_cats:
-        print "Categories:"
+        print("Categories:")
         for name in sorted(uniq_cats):
-            print "\t%s" % name
+            print("\t%s" % name)
         return 0
 
-    for fname in system.keys():
+    for fname in list(system.keys()):
         if FilterFunc(fname, include_list, exclude_list) is True:
             continue
         wantit = False
@@ -499,7 +499,7 @@ def main():
         if CAT_KEY in parms:
             wantit = CategoryIsWanted(parms[CAT_KEY], categories)
         elif uncat:
-            if verbose or debug: print "%s%s" % (fname, "\t# uncategorized, type = %s" % (parms[TYPE_KEY]) if (debug or verbose) else "")
+            if verbose or debug: print("%s%s" % (fname, "\t# uncategorized, type = %s" % (parms[TYPE_KEY]) if (debug or verbose) else ""))
             wantit = True
         if wantit:
             if parms[TYPE_KEY] in TYPE_FILE:
@@ -507,7 +507,7 @@ def main():
                 pkg_files.append((fname, ChecksumFile(root_path, fname)))
             elif parms[TYPE_KEY] in TYPE_DIR:
                 pkg_dirs.append(fname)
-    if verbose or debug: print "%d files\n%d directories" % (len(pkg_files), len(pkg_dirs))
+    if verbose or debug: print("%d files\n%d directories" % (len(pkg_files), len(pkg_dirs)))
 
     # Collect the main keys first
     manifest["files"] = {}
@@ -521,14 +521,14 @@ def main():
 
     tf = tarfile.open(output_file, mode = "w:gz", format = tarfile.PAX_FORMAT)
     if tf is None:
-        print >> sys.stderr, "Cannot create tar file %s" % output_file
+        print("Cannot create tar file %s" % output_file, file=sys.stderr)
         sys.exit(1)
 
     metaobj = tarfile.TarInfo(name="+MANIFEST")
     metaobj.size = len(manifest_string)
     metaobj.type = tarfile.REGTYPE
     
-    tf.addfile(metaobj, StringIO.StringIO(manifest_string))
+    tf.addfile(metaobj, io.StringIO(manifest_string))
     ext_flags = {
         "nodump" : stat.UF_NODUMP,
         "sappnd" : stat.SF_APPEND,
@@ -542,7 +542,7 @@ def main():
         st = os.lstat(tipath)
         if st.st_flags != 0:
             flags = []
-            for key in ext_flags.keys():
+            for key in list(ext_flags.keys()):
                 if st.st_flags & ext_flags[key]: flags.append(key)
             ti.pax_headers["SCHILY.fflags"] = ",".join(flags)
         return ti

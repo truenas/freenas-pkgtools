@@ -1,4 +1,4 @@
-#!/usr/local/bin/python -R
+#!/usr/local/bin/python3 -R
 # Create a pkgng-like package from a directory.
 
 import os, sys, stat, re
@@ -6,8 +6,8 @@ import json
 import tarfile
 import getopt
 import hashlib
-import StringIO
-import ConfigParser
+import io
+import configparser
 
 debug = 0
 verbose = False
@@ -41,7 +41,7 @@ def ScanTree(root, filter_func = None):
                 if filter_func(prefix+f) == True:
                     continue
             full_path = start + "/" + f
-            if verbose or debug > 0: print >> sys.stderr, "looking at %s" % full_path
+            if verbose or debug > 0: print("looking at %s" % full_path, file=sys.stderr)
             st = os.lstat(full_path)
             size = None
             if os.path.islink(full_path):
@@ -67,7 +67,7 @@ def ScanTree(root, filter_func = None):
 # We'll assume some defaults specific to ix.
 
 def usage():
-    print >> sys.stderr, "Usage: %s [-dv] -R <root> -T template -N <name> -V <version> output_file" % sys.argv[0]
+    print("Usage: %s [-dv] -R <root> -T template -N <name> -V <version> output_file" % sys.argv[0], file=sys.stderr)
     sys.exit(1)
 
 SCRIPTS = [
@@ -102,10 +102,10 @@ def ProcessFileList(files, cfg_file):
 
                 flist.close()
             else:
-                if debug: print >> sys.stderr, "Unknown directive: %s" % (command,)
+                if debug: print("Unknown directive: %s" % (command,), file=sys.stderr)
 
         else:
-            if debug: print >> sys.stderr, "Malformed @directive: %s" % (f,)
+            if debug: print("Malformed @directive: %s" % (f,), file=sys.stderr)
 
 def TemplateFiles(path):
     """
@@ -127,7 +127,7 @@ def TemplateFiles(path):
         base_dir = os.path.dirname(path)
         cfg_file = path
 
-    cfp = ConfigParser.ConfigParser()
+    cfp = configparser.ConfigParser()
     try:
         cfp.read(cfg_file)
     except:
@@ -173,7 +173,7 @@ def LoadTemplate(path):
         base_dir = os.path.dirname(path)
         cfg_file = path
 
-    cfp = ConfigParser.ConfigParser()
+    cfp = configparser.ConfigParser()
     try:
         cfp.read(cfg_file)
     except:
@@ -224,7 +224,7 @@ def LoadTemplate(path):
                 else:
                     for svc in cfp.get("Services", "restart").split(","):
                         if not svc in service_list:
-                            print >> sys.stderr, "Restart service %s not in service list" % svc
+                            print("Restart service %s not in service list" % svc, file=sys.stderr)
                         else:
                             restart_list[svc] = True
             sdict = { "Services" : service_list }
@@ -268,21 +268,21 @@ def main():
             elif o == "-v":
                 verbose = True
             else:
-                print >> sys.stderr, "Unknown options %s" % o
+                print("Unknown options %s" % o, file=sys.stderr)
                 usage()
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         usage()
     if len(args) > 1:
-        print >> sys.stderr, "Too many arguments"
+        print("Too many arguments", file=sys.stderr)
         usage()
     elif len(args) == 0:
-        print >> sys.stderr, "Output file must be specified"
+        print("Output file must be specified", file=sys.stderr)
         usage()
     else:
         output = args[0]
     if root is None:
-        print >> sys.stderr, "Root directory must be specified"
+        print("Root directory must be specified", file=sys.stderr)
         usage()
 
     include_list = None
@@ -290,12 +290,12 @@ def main():
     if arg_template is not None:
         tdict = LoadTemplate(arg_template)
         if tdict is not None:
-            for k in tdict.keys():
+            for k in list(tdict.keys()):
                 manifest[k] = tdict[k]
-        print >> sys.stderr, "manifest = %s" % manifest
+        print("manifest = %s" % manifest, file=sys.stderr)
         filters = TemplateFiles(arg_template)
         if filters is not None:
-            if debug > 1:  print >> sys.stderr, "Filter list = %s" % filters
+            if debug > 1:  print("Filter list = %s" % filters, file=sys.stderr)
             if len(filters["include"]) > 0:
                 include_list = filters["include"]
             if len(filters["exclude"]) > 0:
@@ -341,12 +341,12 @@ def main():
                 tmp = pattern
             # First, check to see if the name simply matches
             if path == tmp:
-                if debug: print >> sys.stderr, "Match: %s" % path
+                if debug: print("Match: %s" % path, file=sys.stderr)
                 return True
             # Next, check to see if elem is a subset of it
             if path.startswith(tmp) and \
                path[len(tmp)] == "/":
-                if debug: print >> sys.stderr, "Match %s as child of %s" % (path, tmp)
+                if debug: print("Match %s as child of %s" % (path, tmp), file=sys.stderr)
                 return True
             # Now to start using globbing.
             # fnmatch is awful, but let's try just that
@@ -354,7 +354,7 @@ def main():
             # Thus, "/usr/*.cfg" matches both "/usr/foo.cfg" and
             # "/usr/local/etc/django.cfg".)
             if fnmatch.fnmatch(path, elem):
-                if debug: print >> sys.stderr, "Match: %s as glob match for %s" % (path, tmp)
+                if debug: print("Match: %s as glob match for %s" % (path, tmp), file=sys.stderr)
                 return True
             return False
 
@@ -379,14 +379,14 @@ def main():
 
     # Now sanity test
     if "name" not in manifest:
-        print >> sys.stderr, "Package must have a name"
-        print >> sys.stderr, manifest
+        print("Package must have a name", file=sys.stderr)
+        print(manifest, file=sys.stderr)
         usage()
     if "version" not in manifest:
-        print >> sys.stderr, "Package must have a version"
+        print("Package must have a version", file=sys.stderr)
         usage()
 
-    if debug > 2: print >> sys.stderr, manifest
+    if debug > 2: print(manifest, file=sys.stderr)
 
     # Now start scanning.
     t = ScanTree(root, FilterFunc)
@@ -395,7 +395,7 @@ def main():
     manifest["flatsize"] = t["flatsize"]
     manifest_string = json.dumps(manifest, sort_keys=True,
                                  indent=4, separators=(',', ': '))
-    if debug > 1: print manifest_string
+    if debug > 1: print(manifest_string)
 
     # I would LOVE to be able to use xz, but python's tarfile does not
     # (as of when I write this) support it.  Python 3 has it.
@@ -404,17 +404,17 @@ def main():
     # Add the manifest string as the file "+MANIFEST"
     mani_file_info = tarfile.TarInfo(name = "+MANIFEST")
     mani_file_info.size = len(manifest_string)
-    mani_file_info.mode = 0600
+    mani_file_info.mode = 0o600
     mani_file_info.type = tarfile.REGTYPE
-    mani_file = StringIO.StringIO(manifest_string)
+    mani_file = io.StringIO(manifest_string)
     tf.addfile(mani_file_info, mani_file)
     # Now add all of the files
     for file in sorted(manifest["files"]):
-        if verbose or debug > 0:  print >> sys.stderr, "Adding file %s to archive" % file
+        if verbose or debug > 0:  print("Adding file %s to archive" % file, file=sys.stderr)
         tf.add(root + file, arcname = file, recursive = False)
     # And now the directories
     for dir in sorted(manifest["directories"]):
-        if verbose or debug > 0:  print >> sys.stderr, "Adding directory %s to archive" % dir
+        if verbose or debug > 0:  print("Adding directory %s to archive" % dir, file=sys.stderr)
         tf.add(root + dir, arcname = dir, recursive = False)
 
     return 0

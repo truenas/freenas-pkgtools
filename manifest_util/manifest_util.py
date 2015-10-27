@@ -54,18 +54,18 @@ from freenasOS.Configuration import ChecksumFile
 import freenasOS.Package as Package
 
 def usage(subopt = None):
-    print >> sys.stderr, "Usage: %s [-M manifest] [-C config] [-R remote] cmd [args]"
-    print >> sys.stderr, "cmd is one of:\n"
-    print >> sys.stderr, "\tlist\tList the package contents of the manifest"
-    print >> sys.stderr, "\tsign key\tSign the manifest with the given key file"
-    print >> sys.stderr, "\ttrain\tPrint the train name"
-    print >> sys.stderr, "\tsequence\tPrint the sequence number"
-    print >> sys.stderr, "\tversion\tPrint the version name (if any)"
-    print >> sys.stderr, "\tnotes\tPrint out the release notes (if any)"
-    print >> sys.stderr, "\tshow\tPrint out the sequence number, train name, and version number"
+    print("Usage: %s [-M manifest] [-C config] [-R remote] cmd [args]", file=sys.stderr)
+    print("cmd is one of:\n", file=sys.stderr)
+    print("\tlist\tList the package contents of the manifest", file=sys.stderr)
+    print("\tsign key\tSign the manifest with the given key file", file=sys.stderr)
+    print("\ttrain\tPrint the train name", file=sys.stderr)
+    print("\tsequence\tPrint the sequence number", file=sys.stderr)
+    print("\tversion\tPrint the version name (if any)", file=sys.stderr)
+    print("\tnotes\tPrint out the release notes (if any)", file=sys.stderr)
+    print("\tshow\tPrint out the sequence number, train name, and version number", file=sys.stderr)
 
     if subopt is not None:
-        print >> sys.stderr, "\n%s" % subopt
+        print("\n%s" % subopt, file=sys.stderr)
 
     sys.exit(1)
 
@@ -85,7 +85,7 @@ def show_cmd(mani, args):
     try:
         opts, args = getopt.getopt(args, "qs")
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         show_usage()
 
     for o, a in opts:
@@ -110,7 +110,7 @@ def show_cmd(mani, args):
             s = val
         else:
             s = "%s%s:\t%s" % (indent, name, val)
-        print s
+        print(s)
 
     PrintValue("Version", mani.Version())
     PrintValue("Sequence", mani.Sequence())
@@ -124,7 +124,7 @@ def show_cmd(mani, args):
                 x = ""
             else:
                 x = ":" + ",".join(updates)
-            print "Package[\"%s\"]=\"%s%s\"" % (pkg.Name(), pkg.Version(), x)
+            print("Package[\"%s\"]=\"%s%s\"" % (pkg.Name(), pkg.Version(), x))
     else:
         list_cmd(mani, ["-q"] if quiet else None)
     return
@@ -142,7 +142,7 @@ def list_cmd(mani, args):
     try:
         opts, args = getopt.getopt(args, "q")
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         list_usage()
 
     for o, a in opts:
@@ -153,22 +153,22 @@ def list_cmd(mani, args):
 
     for pkg in mani.Packages():
         if quiet:
-            print "%s-%s" % (pkg.Name(), pkg.Version())
+            print("%s-%s" % (pkg.Name(), pkg.Version()))
         else:
-            print "Package %s:" % pkg.Name()
-            print "\tVersion %s" % pkg.Version()
+            print("Package %s:" % pkg.Name())
+            print("\tVersion %s" % pkg.Version())
             if pkg.Size() is not None:
-                print "\tSize %d" % pkg.Size()
-            print "\tChecksum %s" % pkg.Checksum()
+                print("\tSize %d" % pkg.Size())
+            print("\tChecksum %s" % pkg.Checksum())
             for upd in pkg.Updates():
-                print "\t\tUpdate from %s: checksum %s" % (upd.Version(), upd.Checksum())
+                print("\t\tUpdate from %s: checksum %s" % (upd.Version(), upd.Checksum()))
     return
 
 def verify_cmd(mani, args):
     if mani.VerifySignature() is True:
-        print "Verified"
+        print("Verified")
     else:
-        print "Bad Signature"
+        print("Bad Signature")
         sys.exit(1)
     return
 
@@ -181,8 +181,8 @@ def sign_manifest(mani, path, a):
     try:
         opts, args = getopt.getopt(a, "WO:")
     except getopt.GetoptError as err:
-        print str(err)
-        print >> sys.stderr, "sign [-W | -O <file>] key"
+        print(str(err))
+        print("sign [-W | -O <file>] key", file=sys.stderr)
         usage()
 
     for o, a in opts:
@@ -191,15 +191,15 @@ def sign_manifest(mani, path, a):
         elif o == 'O':
             output_path = a
         else:
-            print >> sys.stderr, "sign [-W | -O <file>] key"
+            print("sign [-W | -O <file>] key", file=sys.stderr)
             usage()
 
     if len(args) == 0:
-        print >> sys.stderr, "Signing requires a key file"
+        print("Signing requires a key file", file=sys.stderr)
         usage()
 
     if output_path and overwrite:
-        print >> sys.stderr, "sign [-W | -O <file>] key"
+        print("sign [-W | -O <file>] key", file=sys.stderr)
         usage()
 
     if overwrite:
@@ -212,7 +212,7 @@ def sign_manifest(mani, path, a):
     try:
         mani.SignWithKey(key_data)
     except:
-        print >> sys.stderr, "Unable to sign file"
+        print("Unable to sign file", file=sys.stderr)
         os.remove(output_file.name)
         sys.exit(1)
 
@@ -228,7 +228,7 @@ def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], "C:M:R:")
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         usage()
 
     for o, a in opts:
@@ -257,22 +257,22 @@ def main():
         mani = conf.SystemManifest()
 
     if mani is None:
-        print >> sys.stderr, "Unable to load manifest"
+        print("Unable to load manifest", file=sys.stderr)
         return(1)
 
 
     if args[0] == "list":
         list_cmd(mani, args[1:])
     elif args[0] == "train":
-        print mani.Train()
+        print(mani.Train())
     elif args[0] == "sequence":
-        print mani.Sequence()
+        print(mani.Sequence())
     elif args[0] == "version":
         if mani.Version() is not None:
-            print mani.Version()
+            print(mani.Version())
     elif args[0] == "notes":
         if mani.Notes() is not None:
-            print mani.Notes()
+            print(mani.Notes())
     elif args[0] == "show":
         show_cmd(mani, args[1:])
     elif args[0] == "verify":

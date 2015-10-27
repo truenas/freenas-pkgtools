@@ -13,30 +13,30 @@ def PrintDifferences(diffs):
             pkg_diffs = diffs[type]
             for (pkg, op, old) in pkg_diffs:
                 if op == "delete":
-                    print >> sys.stderr, "Delete package %s" % pkg.Name()
+                    print("Delete package %s" % pkg.Name(), file=sys.stderr)
                 elif op == "install":
-                    print >> sys.stderr, "Install package %s-%s" % (pkg.Name(), pkg.Version())
+                    print("Install package %s-%s" % (pkg.Name(), pkg.Version()), file=sys.stderr)
                 elif op == "upgrade":
-                    print >> sys.stderr, "Upgrade package %s %s->%s" % (pkg.Name(), old.Version(), pkg.Version())
+                    print("Upgrade package %s %s->%s" % (pkg.Name(), old.Version(), pkg.Version()), file=sys.stderr)
                 else:
-                    print >> sys.stderr, "Unknown package operation %s for packge %s-%s" % (op, pkg.Name(), pkg.Version())
+                    print("Unknown package operation %s for packge %s-%s" % (op, pkg.Name(), pkg.Version()), file=sys.stderr)
         elif type == "Restart":
             from freenasOS.Update import GetServiceDescription
             for svc in diffs[type]:
                 desc = GetServiceDescription(svc)
                 if desc:
-                    print "%s" % desc
+                    print("%s" % desc)
                 else:
-                    print "Unknown service restart %s?!" % svc
+                    print("Unknown service restart %s?!" % svc)
         elif type in ("Train", "Sequence"):
             # Train and Sequence are a single tuple, (old, new)
             old, new = diffs[type]
-            print >> sys.stderr, "%s %s -> %s" % (type, old, new)
+            print("%s %s -> %s" % (type, old, new), file=sys.stderr)
         elif type == "Reboot":
             rr = diffs[type]
-            print >> sys.stderr, "Reboot is (conditionally) %srequired" % ("" if rr else "not ")
+            print("Reboot is (conditionally) %srequired" % ("" if rr else "not "), file=sys.stderr)
         else:
-            print >> sys.stderrr, "*** Unknown key %s (value %s)" % (type, str(diffs[type]))
+            print("*** Unknown key %s (value %s)" % (type, str(diffs[type])), file=sys.stderrr)
 
 def main():
     global log
@@ -74,9 +74,9 @@ def main():
     import freenasOS.Update as Update
 
     def usage():
-        print >> sys.stderr, """Usage: %s [-C cache_dir] [-d] [-T train] [--no-delta] [-v] <cmd>, where cmd is one of:
+        print("""Usage: %s [-C cache_dir] [-d] [-T train] [--no-delta] [-v] <cmd>, where cmd is one of:
         check\tCheck for updates
-        update\tDo an update""" % sys.argv[0]
+        update\tDo an update""" % sys.argv[0], file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -89,7 +89,7 @@ def main():
                       ]
         opts, args = getopt.getopt(sys.argv[1:], short_opts, long_opts)
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         usage()
 
     verbose = False
@@ -130,7 +130,7 @@ def main():
         if cache_dir is None:
             download_dir = tempfile.mkdtemp(prefix = "UpdateCheck-", dir = config.TemporaryDirectory())
             if download_dir is None:
-                print >> sys.stderr, "Unable to create temporary directory"
+                print("Unable to create temporary directory", file=sys.stderr)
                 sys.exit(1)
         else:
             download_dir = cache_dir
@@ -138,14 +138,14 @@ def main():
         rv = Update.DownloadUpdate(train, download_dir, pkg_type = pkg_type)
         if rv is False:
             if verbose:
-                print "No updates available"
+                print("No updates available")
             if cache_dir is None:
                 Update.RemoveUpdate(download_dir)
             sys.exit(1)
         else:
             diffs = Update.PendingUpdatesChanges(download_dir)
             if diffs is None or len(diffs) == 0:
-                print >> sys.stderr, "Strangely, DownloadUpdate says there updates, but PendingUpdates says otherwise"
+                print("Strangely, DownloadUpdate says there updates, but PendingUpdates says otherwise", file=sys.stderr)
                 sys.exit(1)
             PrintDifferences(diffs)
             if cache_dir is None:
@@ -163,7 +163,7 @@ def main():
         try:
             update_opts, update_args = getopt.getopt(args[1:], "R", "--reboot")
         except getopt.GetoptError as err:
-            print str(err)
+            print(str(err))
             usage()
 
         force_reboot = False
@@ -176,12 +176,12 @@ def main():
         if cache_dir is None:
             download_dir = tempfile.mkdtemp(prefix = "UpdateUpdate-", dir = config.TemporaryDirectory())
             if download_dir is None:
-                print >> sys.stderr, "Unable to create temporary directory"
+                print("Unable to create temporary directory", file=sys.stderr)
                 sys.exit(1)
             rv = Update.DownloadUpdate(train, download_dir, pkg_type = pkg_type)
             if rv is False:
                 if verbose or debug:
-                    print >> sys.stderr, "DownloadUpdate returned False"
+                    print("DownloadUpdate returned False", file=sys.stderr)
                 sys.exit(1)
         else:
             download_dir = cache_dir
@@ -189,19 +189,19 @@ def main():
         diffs = Update.PendingUpdatesChanges(download_dir)
         if diffs is None or diffs == {}:
             if verbose:
-                print >> sys.stderr, "No updates to apply"
+                print("No updates to apply", file=sys.stderr)
         else:
             if verbose:
                 PrintDifferences(diffs)
             try:
                 rv = Update.ApplyUpdate(download_dir, force_reboot = force_reboot)
             except BaseException as e:
-                print >> sys.stderr, "Unable to apply update: %s" % str(e)
+                print("Unable to apply update: %s" % str(e), file=sys.stderr)
                 sys.exit(1)
             if cache_dir is None:
                 Update.RemoveUpdate(download_dir)    
             if rv:
-                print >> sys.stderr, "System should be rebooted now"
+                print("System should be rebooted now", file=sys.stderr)
             sys.exit(0)
     else:
         usage()
