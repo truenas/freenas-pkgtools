@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/local/bin/python3
 #
 # Given a metalog file from a freebsd build system,
 # read each line, and create (using the path as key)
