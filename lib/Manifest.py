@@ -2,9 +2,7 @@ import os
 import json
 import logging
 
-import Configuration
-import Exceptions
-import Package
+from . import Configuration, Exceptions, Package
 
 log = logging.getLogger('freenasOS.Manifest')
 
@@ -86,7 +84,7 @@ def DiffManifests(m1, m2):
             else:
                 retval.append((P, "install", None))
 
-        for P in old_list.itervalues():
+        for P in old_list.values():
             retval.insert(0, (P, "delete", None))
     
         return retval
@@ -295,7 +293,7 @@ class Manifest(object):
     def Notes(self, raw = False):
         if NOTES_KEY in self._dict:
             rv = {}
-            for name in self._dict[NOTES_KEY].keys():
+            for name in list(self._dict[NOTES_KEY].keys()):
                 loc = self._dict[NOTES_KEY][name]
                 if raw is False and not loc.startswith(self._config.UpdateServerURL()):
                     loc = "%s/%s/Notes/%s" % (self._config.UpdateServerURL(), self.Train(), loc)
@@ -308,7 +306,7 @@ class Manifest(object):
         if notes is None:
             self._dict.pop(NOTES_KEY)
         else:
-            for name, loc in notes.iteritems():
+            for name, loc in notes.items():
                 if loc.startswith(self._config.UpdateServerURL()):
                     loc = loc[len(self._config.UpdateServerURL()):]
                 self._dict[NOTES_KEY][name] = os.path.basename(loc)

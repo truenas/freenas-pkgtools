@@ -71,7 +71,7 @@ class Package(object):
                     return []
             tmpSet = set(self._base.RestartServices())
             if SERVICES_KEY in self._dict:
-                for svc, rst in self._dict[SERVICES_KEY].iteritems():
+                for svc, rst in self._dict[SERVICES_KEY].items():
                     if rst:
                         tmpSet.add(svc)
                     else:
@@ -84,7 +84,7 @@ class Package(object):
         # We can be called with a dictionary, or with (name, version, checksum)
         if len(args) == 1 and isinstance(args[0], dict):
             tdict = args[0]
-            for k in tdict.keys():
+            for k in list(tdict.keys()):
                 if k == UPGRADES_KEY:
                     updates = []
                     for update in tdict[UPGRADES_KEY]:

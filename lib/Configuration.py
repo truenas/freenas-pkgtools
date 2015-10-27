@@ -1,21 +1,21 @@
-import ConfigParser
+import configparser
 import hashlib
 import logging
 import os
 import sys
 import tempfile
 import time
-import urllib2
-import httplib
+import urllib.request, urllib.error, urllib.parse
+import http.client
 import socket
 import ssl
 
 from . import Avatar, UPDATE_SERVER
-import Exceptions
-import Installer
-import Train
-import Package
-import Manifest
+from . import Exceptions
+from . import Installer
+from . import Train
+from . import Package
+from . import Manifest
 
 from stat import (
     S_ISDIR, S_ISCHR, S_ISBLK, S_ISREG, S_ISFIFO, S_ISLNK, S_ISSOCK,
@@ -75,9 +75,9 @@ def TryOpenFile(path):
 # http://stackoverflow.com/questions/1087227/validate-ssl-certificates-with-python
 
 
-class InvalidCertificateException(httplib.HTTPException, urllib2.URLError):
+class InvalidCertificateException(http.client.HTTPException, urllib.error.URLError):
     def __init__(self, host, cert, reason):
-        httplib.HTTPException.__init__(self)
+        http.client.HTTPException.__init__(self)
         self.host = host
         self.cert = cert
         self.reason = reason
@@ -87,12 +87,12 @@ class InvalidCertificateException(httplib.HTTPException, urllib2.URLError):
                 (self.host, self.reason, self.cert))
 
 
-class CertValidatingHTTPSConnection(httplib.HTTPConnection):
-    default_port = httplib.HTTPS_PORT
+class CertValidatingHTTPSConnection(http.client.HTTPConnection):
+    default_port = http.client.HTTPS_PORT
 
     def __init__(self, host, port=None, key_file=None, cert_file=None,
                              ca_certs=None, strict=None, **kwargs):
-        httplib.HTTPConnection.__init__(self, host, port, strict, **kwargs)
+        http.client.HTTPConnection.__init__(self, host, port, strict, **kwargs)
         self.key_file = key_file
         self.cert_file = cert_file
         self.ca_certs = ca_certs
@@ -132,7 +132,7 @@ class CertValidatingHTTPSConnection(httplib.HTTPConnection):
                                                   'hostname mismatch')
 
 
-class VerifiedHTTPSHandler(urllib2.HTTPSHandler):
+class VerifiedHTTPSHandler(urllib.request.HTTPSHandler):
     def __init__(self, **kwargs):
         urllib2.AbstractHTTPHandler.__init__(self)
         self._connection_args = kwargs
@@ -145,13 +145,13 @@ class VerifiedHTTPSHandler(urllib2.HTTPSHandler):
 
         try:
             return self.do_open(http_class_wrapper, req)
-        except urllib2.URLError, e:
+        except urllib.error.URLError as e:
             if type(e.reason) == ssl.SSLError and e.reason.args[0] == 1:
                 raise InvalidCertificateException(req.host, '',
                                                   e.reason.args[1])
             raise
 
-    https_request = urllib2.HTTPSHandler.do_request_
+    https_request = urllib.request.HTTPSHandler.do_request_
 
 
 class PackageDB:
@@ -192,7 +192,7 @@ class PackageDB:
         return
 
     def _connectdb(self, returniferror = False, cursor = False):
-	import sqlite3
+        import sqlite3
         if self.__conn is not None:
             if cursor:
                 return self.__conn.cursor()
@@ -251,7 +251,7 @@ class PackageDB:
         cur.execute("UPDATE packages SET version = ? WHERE name = ?", (newVers, pkgName))
         cur.execute("DELETE FROM scripts WHERE package = ?", (pkgName,))
         if scripts is not None:
-            for scriptType in scripts.keys():
+            for scriptType in list(scripts.keys()):
                 cur.execute("INSERT INTO scripts(package, type, script) VALUES(?, ?, ?)",
                             (pkgName, scriptType, scripts[scriptType]))
 
@@ -265,7 +265,7 @@ class PackageDB:
         cur = self.__conn.cursor()
         cur.execute("INSERT INTO packages VALUES(?, ?)", (pkgName, vers))
         if scripts is not None:
-            for scriptType in scripts.keys():
+            for scriptType in list(scripts.keys()):
                 cur.execute("INSERT INTO scripts(package, type, script) VALUES(?, ?, ?)",
                             (pkgName, scriptType, scripts[scriptType]))
         self._closedb()
@@ -300,7 +300,7 @@ class PackageDB:
         rv = []
         for f in files:
             tmp = {}
-            for k in f.keys():
+            for k in list(f.keys()):
                 tmp[k] = f[k]
             rv.append(tmp)
         return rv
@@ -314,7 +314,7 @@ class PackageDB:
         if row is None:
             return None
         rv = {}
-        for k in row.keys():
+        for k in list(row.keys()):
             rv[k] = row[k]
         return rv
 
@@ -551,8 +551,8 @@ class Configuration(object):
 
         try:
             https_handler = VerifiedHTTPSHandler(ca_certs = DEFAULT_CA_FILE)
-            opener = urllib2.build_opener(https_handler)
-            req = urllib2.Request(file_url)
+            opener = urllib.request.build_opener(https_handler)
+            req = urllib.request.Request(file_url)
             req.add_header("X-iXSystems-Project", Avatar())
             req.add_header("X-iXSystems-Version", current_version)
             if host_id:
@@ -629,7 +629,7 @@ class Configuration(object):
             try:
                 with open(train_path, "r") as f:
                     trains = json.load(f)
-                for train_name in trains.keys():
+                for train_name in list(trains.keys()):
                     temp = Train.Train(train_name)
                     if TRAIN_DESC_KEY in trains[train_name]:
                         temp.SetDescription(trains[train_name][TRAIN_DESC_KEY])
@@ -667,7 +667,7 @@ class Configuration(object):
             self._trains[current_train] = Train.Train(current_train, "Installed OS", sys_mani.Sequence())
         if self._temp:
             obj = {}
-            for train_name in self._trains.keys():
+            for train_name in list(self._trains.keys()):
                 train = self._trains[train_name]
                 temp = {}
                 if train.Description():
@@ -702,7 +702,7 @@ class Configuration(object):
         cfp = None
         try:
             with open(self._root + path, "r") as f:
-                cfp = ConfigParser.SafeConfigParser()
+                cfp = configparser.SafeConfigParser()
                 cfp.readfp(f)
         except:
             return
@@ -937,7 +937,7 @@ class Configuration(object):
         return file
 
     def FindPackageFile(self, package, upgrade_from=None, handler=None, save_dir = None, pkg_type = None):
-        from Update import PkgFileDeltaOnly, PkgFileFullOnly
+        from .Update import PkgFileDeltaOnly, PkgFileFullOnly
         # Given a package, and optionally a version to upgrade from, find
         # the package file for it.  Returns a file-like
         # object for the package file.

@@ -9,7 +9,7 @@ import logging
 import tempfile
 
 # And now freenas modules
-import Configuration
+from . import Configuration
 
 debug = 0
 verbose = False
@@ -181,7 +181,7 @@ def RemoveDirectory(path):
 
 def MakeDirs(dir):
     try:
-        os.makedirs(dir, 0755)
+        os.makedirs(dir, 0o755)
     except:
         pass
     return
@@ -282,8 +282,8 @@ def RunPkgScript(scripts, type, root = None, **kwargs):
     if "SCRIPT_ARG" in kwargs and kwargs["SCRIPT_ARG"] is not None:
         args.append(kwargs["SCRIPT_ARG"])
         
-    print "script (chroot to %s):  %s\n-----------" % ("/" if root is None else root, args)
-    print "%s\n--------------" % scripts[type]
+    print("script (chroot to %s):  %s\n-----------" % ("/" if root is None else root, args))
+    print("%s\n--------------" % scripts[type])
     if os.geteuid() != 0 and root is not None:
         log.error("Installation root is set, and process is not root.  Cannot run script %s" % type)
         if debug < 4:
@@ -657,7 +657,7 @@ def install_file(pkgfile, dest):
     if PKG_DIRS_KEY in mjson:
         mdirs.update(mjson[PKG_DIRS_KEY])
     
-    print "%s-%s" % (pkgName, pkgVersion)
+    print("%s-%s" % (pkgName, pkgVersion))
     if debug > 1:  log.debug("installation target = %s" % dest)
         
     # Note that none of this is at all atomic.
@@ -680,7 +680,7 @@ def install_file(pkgfile, dest):
                   (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA in pkgScripts)) and \
                  pkgDeltaVersion is not None)
 
-        print "upgrade_aware = %s" % upgrade_aware
+        print("upgrade_aware = %s" % upgrade_aware)
         # First thing we do, if we're upgrade-aware, is to run the
         # upgrade scripts from the old version.
         if upgrade_aware:
@@ -789,7 +789,7 @@ def install_file(pkgfile, dest):
             # It may be a directory, however, so let's check
             if EntryInDictionary(member.name, mdirs, prefix) == False:
                 # If we don't skip it, we infinite loop.  That's bad.
-                member = t.next()
+                member = next(t)
                 continue
         if pkgDeltaVersion is not None:
             if verbose or debug: log.debug("Extracting %s from delta package" % member.name)
@@ -797,7 +797,7 @@ def install_file(pkgfile, dest):
         if list is not None:
             pkgFiles.append((pkgName,) + list)
     
-        member = t.next()
+        member = next(t)
     
     if len(pkgFiles) > 0:
         pkgdb.AddFilesBulk(pkgFiles)

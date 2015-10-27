@@ -154,7 +154,7 @@ def RunCommand(command, args):
     if args is not None:  proc_args.extend(args)
     log.debug("RunCommand(%s, %s)" % (command, args))
     if debug:
-        print >> sys.stderr, proc_args
+        print(proc_args, file=sys.stderr)
         child = 0
     else:
         libc = ctypes.cdll.LoadLibrary("libc.so.7")
@@ -179,7 +179,7 @@ def GetRootDataset():
     # This will be of the form zroot/ROOT/<be-name>
     cmd = ["/bin/df", "/"]
     if debug:
-        print >> sys.stderr, cmd
+        print(cmd, file=sys.stderr)
         return None
     try:
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -318,7 +318,7 @@ def ListClones():
     cmd = [beadm, "list", "-H" ]
     rv = []
     if debug:
-        print >> sys.stderr, cmd
+        print(cmd, file=sys.stderr)
         return None
     try:
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -610,7 +610,7 @@ def GetUpdateChanges(old_manifest, new_manifest, cache_dir = None):
                 if not svc in base_list:
                     base_list.append(svc)
         elif isinstance(new_list, dict):
-            for svc, val in new_list.iteritems():
+            for svc, val in new_list.items():
                 if val:
                     if not svc in base_list:
                         base_list.append(svc)
