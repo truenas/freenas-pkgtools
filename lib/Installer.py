@@ -486,9 +486,9 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
             # But they remove the leading / for the target,
             # so we have to do the same.
             if entry.linkname.startswith("/"):
-                hash = hashlib.sha256(entry.linkname[1:]).hexdigest()
+                hash = hashlib.sha256(entry.linkname[1:].encode('utf8')).hexdigest()
             else:
-                hash = hashlib.sha256(entry.linkname).hexdigest()
+                hash = hashlib.sha256(entry.linkname.encode('utf8')).hexdigest()
             if hash != mFileHash:
                 log.error("%s hash does not match manifest" % entry.name)
                 hash = ""

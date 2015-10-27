@@ -1119,7 +1119,7 @@ def do_verify(verify_handler=None):
         i = i+1
         if verify_handler is not None:
             verify_handler(i,total_files,objs["path"])
-        tmp = '' # Just a temp. variable to store the text to be hashed
+        tmp = b'' # Just a temp. variable to store the text to be hashed
         if is_ignore_path(objs["path"]):
             continue
         if not os.path.lexists(objs["path"]):
@@ -1143,7 +1143,7 @@ def do_verify(verify_handler=None):
             warn_list.append(pd)
 
         if objs["kind"] == "slink":
-            tmp = os.readlink(objs["path"])
+            tmp = os.readlink(objs["path"]).encode('utf8')
             if tmp.startswith('/'):
                 tmp = tmp[1:]
 

@@ -93,9 +93,9 @@ def ChecksumFile(root, path):
         # Symlinks have their leading / (if any) removed
         link_target = os.readlink(full_path)
         if link_target[0] == "/":
-            return hashlib.sha256(link_target[1:]).hexdigest()
+            return hashlib.sha256(link_target[1:].encode('utf8')).hexdigest()
         else:
-            return hashlib.sha256(link_target).hexdigest()
+            return hashlib.sha256(link_target.encode('utf8')).hexdigest()
     elif os.path.isfile(full_path):
         with open(full_path, "rb") as f:
             retval = hashlib.sha256(f.read()).hexdigest()

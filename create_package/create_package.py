@@ -48,7 +48,7 @@ def ScanTree(root, filter_func = None):
                 buf = os.readlink(full_path)
                 size = len(buf)
                 if buf.startswith("/"): buf = buf[1:]
-                file_list[prefix + f] = hashlib.sha256(buf).hexdigest()
+                file_list[prefix + f] = hashlib.sha256(buf.encode('utf8')).hexdigest()
             elif os.path.isfile(full_path):
                 size = st.st_size
                 with open(full_path, 'rb') as file:
