@@ -528,7 +528,7 @@ def main():
     metaobj.size = len(manifest_string)
     metaobj.type = tarfile.REGTYPE
     
-    tf.addfile(metaobj, io.StringIO(manifest_string))
+    tf.addfile(metaobj, io.BytesIO(manifest_string.encode('utf8')))
     ext_flags = {
         "nodump" : stat.UF_NODUMP,
         "sappnd" : stat.SF_APPEND,

@@ -242,7 +242,7 @@ def DiffPackageFiles(pkg1, pkg2, output_file = None, scripts = None, force_outpu
     mani_file_info.size = len(new_manifest_string)
     mani_file_info.mode = 0o600
     mani_file_info.type = tarfile.REGTYPE
-    mani_file = io.StringIO(new_manifest_string)
+    mani_file = io.BytesIO(new_manifest_string.encode('utf8'))
     new_tf.addfile(mani_file_info, mani_file)
     mani_file.close()
 

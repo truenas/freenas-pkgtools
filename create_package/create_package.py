@@ -406,7 +406,7 @@ def main():
     mani_file_info.size = len(manifest_string)
     mani_file_info.mode = 0o600
     mani_file_info.type = tarfile.REGTYPE
-    mani_file = io.StringIO(manifest_string)
+    mani_file = io.BytesIO(manifest_string.encode('utf8'))
     tf.addfile(mani_file_info, mani_file)
     # Now add all of the files
     for file in sorted(manifest["files"]):
