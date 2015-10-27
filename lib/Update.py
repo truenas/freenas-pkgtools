@@ -1324,7 +1324,7 @@ def VerifyUpdate(directory):
             # Okay, at least one of them exists.
             # Let's try the full file first
             try:
-                with open(directory + "/" + pkg.FileName()) as f:
+                with open(directory + "/" + pkg.FileName(), 'rb') as f:
                     if pkg.Checksum():
                         cksum = Configuration.ChecksumFile(f)
                         if cksum == pkg.Checksum():
@@ -1346,7 +1346,7 @@ def VerifyUpdate(directory):
             if update and update.Checksum():
                 upd_cksum = update.Checksum()
                 try:
-                    with open(directory + "/" + pkg.FileName(cur_vers)) as f:
+                    with open(directory + "/" + pkg.FileName(cur_vers), 'rb') as f:
                         cksum = Configuration.ChecksumFile(f)
                         if upd_cksum != cksum:
                             update = None

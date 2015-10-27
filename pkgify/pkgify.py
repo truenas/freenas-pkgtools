@@ -97,7 +97,7 @@ def ChecksumFile(root, path):
         else:
             return hashlib.sha256(link_target).hexdigest()
     elif os.path.isfile(full_path):
-        with open(full_path, "r") as f:
+        with open(full_path, "rb") as f:
             retval = hashlib.sha256(f.read()).hexdigest()
         return retval
     else:

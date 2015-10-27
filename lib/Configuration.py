@@ -1004,7 +1004,7 @@ class Configuration(object):
                 if self._package_dir:
                     p = "%s/%s" % (self._package_dir, search_attempt["Filename"])
                     if os.path.exists(p):
-                        file = open(p)
+                        file = open(p, 'rb')
                         log.debug("Found package file %s" % p)
                         if search_attempt["Checksum"]:
                             h = ChecksumFile(file)
@@ -1150,7 +1150,7 @@ def do_verify(verify_handler=None):
         if objs["kind"] == "file":
             if objs["path"].endswith(".pyc"):
                 continue
-            tmp = open(objs["path"]).read()
+            tmp = open(objs["path"], 'rb').read()
 
         # Do this last (as it needs to be done for all, but dirs, as dirs have no checksum d'oh!)
         if (

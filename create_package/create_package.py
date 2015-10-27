@@ -51,7 +51,7 @@ def ScanTree(root, filter_func = None):
                 file_list[prefix + f] = hashlib.sha256(buf).hexdigest()
             elif os.path.isfile(full_path):
                 size = st.st_size
-                with open(full_path) as file:
+                with open(full_path, 'rb') as file:
                     file_list[prefix + f] = hashlib.sha256(file.read()).hexdigest()
 
             if size is not None and (st.st_dev, st.st_ino) not in seen_files:
