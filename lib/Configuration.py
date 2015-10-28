@@ -57,7 +57,7 @@ def ChecksumFile(fobj):
         return fobj.read(chunksize)
     hash = hashlib.sha256()
     fobj.seek(0)
-    for piece in iter(readchunk, ''):
+    for piece in iter(readchunk, b''):
         hash.update(piece)
     fobj.seek(0)
     return hash.hexdigest()
