@@ -8,9 +8,6 @@ import hashlib
 import logging
 import tempfile
 
-# And now freenas modules
-from . import Configuration
-
 debug = 0
 verbose = False
 
@@ -581,6 +578,7 @@ def install_path(pkgfile, dest):
         return install_file(f, dest)
             
 def install_file(pkgfile, dest):
+    from . import Configuration
     global debug, verbose, dryrun
     prefix = None
     # We explicitly want to use the pkgdb from the destination
@@ -825,6 +823,7 @@ class Installer(object):
 
         if self._conf is None:
             # Get the system configuration
+            from . import Configuration
             self._conf = Configuration.Configuration()
         if self._manifest is None:
             self._manifest = self._conf.SystemManifest()

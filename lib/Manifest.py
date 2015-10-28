@@ -2,7 +2,7 @@ import os
 import json
 import logging
 
-from . import Configuration, Exceptions, Package
+from . import Exceptions, Package
 
 log = logging.getLogger('freenasOS.Manifest')
 
@@ -169,6 +169,7 @@ class Manifest(object):
 
     def __init__(self, configuration = None, require_signature = False):
         if configuration is None:
+            from . import Configuration
             self._config = Configuration.Configuration()
         else:
             self._config = configuration
