@@ -787,7 +787,7 @@ def install_file(pkgfile, dest):
             # It may be a directory, however, so let's check
             if EntryInDictionary(member.name, mdirs, prefix) == False:
                 # If we don't skip it, we infinite loop.  That's bad.
-                member = next(t)
+                member = t.next()
                 continue
         if pkgDeltaVersion is not None:
             if verbose or debug: log.debug("Extracting %s from delta package" % member.name)
@@ -795,7 +795,7 @@ def install_file(pkgfile, dest):
         if list is not None:
             pkgFiles.append((pkgName,) + list)
     
-        member = next(t)
+        member = t.next()
     
     if len(pkgFiles) > 0:
         pkgdb.AddFilesBulk(pkgFiles)
