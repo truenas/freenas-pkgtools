@@ -450,10 +450,10 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
             pass
         newfile = None
         try:
-            f = open(full_path, "wb")
+            f = open(full_path, "w")
         except:
             newfile = full_path + ".new"
-            f = open(newfile, "wb")
+            f = open(newfile, "w")
         while True:
             d = temp_entry.read(1024 * 1024)
             if d:
@@ -473,8 +473,9 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
         # If the directory already exists, we don't care.
         try:
             os.makedirs(full_path)
-        except FileExistsError:
-            pass
+        except os.error as e:
+            if e[0] != errno.EEXIST:
+                raise e
         SetPosix(full_path, meta)
         
         type = "dir"
@@ -499,8 +500,8 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
         # Then create the new one.
         try:
             os.unlink(full_path)
-        except PermissionError as e:
-            if os.path.isdir(full_path):
+        except os.error as e:
+            if e[0] == errno.EPERM and os.path.isdir(full_path):
                 # You can't unlink a directory these days.
                 import shutil
                 try:
@@ -509,11 +510,9 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
                 except BaseException as e2:
                     log.error("Couldn't rmtree %s: %s" % (full_path, str(e2)))
                     raise e2
-        except FileNotFoundError as e:
-            pass
-        except OSError as e:
-            log.error("Couldn't unlink %s: %s" % (full_path, e))
-            raise e
+            elif e[0] != errno.ENOENT:
+                log.error("Couldn't unlink %s: %s" % (full_path, e[0]))
+                raise e
         os.symlink(entry.linkname, full_path)
         SetPosix(full_path, meta)
         type = "slink"
@@ -529,8 +528,8 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
                 pass
             try:
                 os.link(source_file, full_path)
-            except OSError as e:
-                if e.errno == errno.EXDEV:
+            except os.error as e:
+                if e[0] == errno.EXDEV:
                     log.debug("Unable to link %s -> %s, trying a copy" % (source_file, full_path))
                     # Cross-device link, so we'll just copy it
                     try:
@@ -553,7 +552,7 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
             if st.st_flags != 0:
                 os.lchflags(source_file, st.st_flags)
         
-        except OSError as e:
+        except os.error as e:
             log.error("Could not link %s to %s: %s" % (source_file, full_path, str(e)))
             sys.exit(1)
         # Except on mac os, hard links are always files.
@@ -603,7 +602,7 @@ def install_file(pkgfile, dest):
         if not member.name.startswith("+"): break
         if member.name == PKG_MANIFEST_NAME:
             manifest = t.extractfile(member)
-            mjson = json.loads(manifest.read().decode('utf8'))
+            mjson = json.load(manifest)
             manifest.close()
 
     # All packages must have a +MANIFEST file.
