@@ -44,7 +44,7 @@ def FindManifest(tf):
             return (retval, entry)
         if entry.name == "+MANIFEST":
             mfile = tf.extractfile(entry)
-            retval = json.load(mfile)
+            retval = json.loads(mfile.read().decode('utf8'))
 #            print >> sys.stderr, "MANIFEST"
 #            print >> sys.stderr, json.dumps(retval, sort_keys = True, indent = 4, separators=(',', ': '))
     return (retval, entry)
