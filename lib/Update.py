@@ -190,7 +190,7 @@ def GetRootDataset():
     if p.returncode != 0:
         log.error("%s returned %d" % (cmd, p.returncode))
         return None
-    lines = stdout.rstrip().split("\n")
+    lines = stdout.decode('utf8').rstrip().split("\n")
     if len(lines) != 2:
         log.error("Unexpected output from %s, too many lines (%d):  %s" % (cmd, len(lines), lines))
         return None
@@ -330,7 +330,7 @@ def ListClones():
         log.error("`%s' returned %d" %( cmd, p.returncode))
         return None
 
-    for line in stdout.strip('\n').split('\n'):
+    for line in stdout.decode('utf8').strip('\n').split('\n'):
         fields = line.split('\t')
         name = fields[0]
         if len(fields) > 5 and fields[5] != "-":
@@ -346,7 +346,7 @@ def ListClones():
         try:
             prop_cmd = ["/sbin/zfs", "get", "-H", "-o", "value", "beadm:keep"]
             prop_cmd.append("freenas-boot/ROOT/{0}".format(tdict["realname"]))
-            keep_str = subprocess.check_output(prop_cmd).rstrip()
+            keep_str = subprocess.check_output(prop_cmd).decode('utf8').rstrip()
             if keep_str == "-":
                 tdict["keep"] = None
             else:
