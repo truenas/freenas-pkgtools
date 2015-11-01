@@ -8,6 +8,8 @@ import getopt
 import hashlib
 import io
 import configparser
+import subprocess
+import tempfile
 
 debug = 0
 verbose = False
@@ -399,7 +401,8 @@ def main():
 
     # I would LOVE to be able to use xz, but python's tarfile does not
     # (as of when I write this) support it.  Python 3 has it.
-    tf = tarfile.open(output, "w:gz", format = tarfile.PAX_FORMAT)
+    temp_file = output.rsplit('.', 1)[0] + '.tar'
+    tf = tarfile.open(temp_file, "w", format = tarfile.PAX_FORMAT)
 
     # Add the manifest string as the file "+MANIFEST"
     mani_file_info = tarfile.TarInfo(name = "+MANIFEST")
@@ -416,6 +419,17 @@ def main():
     for dir in sorted(manifest["directories"]):
         if verbose or debug > 0:  print("Adding directory %s to archive" % dir, file=sys.stderr)
         tf.add(root + dir, arcname = dir, recursive = False)
+
+    tf.close()
+
+    if os.path.exists('/usr/local/bin/pigz'):
+        subprocess.Popen("/usr/local/bin/pigz -c -9 {0} > {1}".format(temp_file, output), shell=True).wait()
+    else:
+        subprocess.Popen("gzip -c -9 {0} > {1}".format(temp_file, output), shell=True).wait()
+    try:
+        os.unlink(temp_file)
+    except:
+        pass
 
     return 0
 
