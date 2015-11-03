@@ -187,7 +187,7 @@ class Manifest(object):
     def LoadFile(self, file):
         # Load a manifest from a file-like object.
         # It's loaded as a json file, and then parsed
-        self._dict = json.load(file)
+        self._dict = json.loads(file.read().decode('utf8'))
 
         self.Validate()
         return
