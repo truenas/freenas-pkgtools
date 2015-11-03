@@ -187,7 +187,10 @@ class Manifest(object):
     def LoadFile(self, file):
         # Load a manifest from a file-like object.
         # It's loaded as a json file, and then parsed
-        self._dict = json.loads(file.read().decode('utf8'))
+        if 'b' in file.mode:
+            self._dict = json.loads(file.read().decode('utf8'))
+        else:
+            self._dict = json.loads(file.read())
 
         self.Validate()
         return
@@ -199,10 +202,10 @@ class Manifest(object):
         return
 
     def StoreFile(self, f):
-        f.write(self.String())
+        f.write(self.String().encode('utf8'))
 
     def StorePath(self, path):
-        with open(path, "w") as f:
+        with open(path, "wb") as f:
             self.StoreFile(f)
         return
 
