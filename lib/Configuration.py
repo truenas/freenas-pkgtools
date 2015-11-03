@@ -134,7 +134,7 @@ class CertValidatingHTTPSConnection(http.client.HTTPConnection):
 
 class VerifiedHTTPSHandler(urllib.request.HTTPSHandler):
     def __init__(self, **kwargs):
-        urllib2.AbstractHTTPHandler.__init__(self)
+        urllib.request.AbstractHTTPHandler.__init__(self)
         self._connection_args = kwargs
 
     def https_open(self, req):
