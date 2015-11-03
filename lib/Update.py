@@ -800,7 +800,7 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
         return False
 
     try:
-        mani_file = open(directory + "/MANIFEST", "wxb")
+        mani_file = open(directory + "/MANIFEST", "wb")
     except (IOError, Exception) as e:
         log.error("Unale to create manifest file in directory %s" % (directory, str(e)))
         return False

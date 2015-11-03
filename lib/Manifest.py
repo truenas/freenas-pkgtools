@@ -194,7 +194,7 @@ class Manifest(object):
 
     def LoadPath(self, path):
         # Load a manifest from a path.
-        with open(path, "r") as f:
+        with open(path, "rb") as f:
             self.LoadFile(f)
         return
 
