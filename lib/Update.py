@@ -817,6 +817,7 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
         log.debug("DownloadUpdate:  No update available")
         # Remove the cache directory and empty manifest file
         RemoveUpdate(directory)
+        mani_file.close()
         return False
     log.debug("DownloadUpdate:  diffs = %s" % diffs)
     
@@ -844,6 +845,7 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
         if pkg_file is None:
             log.error("Could not download package file for %s" % pkg.Name())
             RemoveUpdate(directory)
+            mani_file.close()
             return False
 
     # Almost done:  get a changelog if one exists for the train
