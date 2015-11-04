@@ -538,7 +538,8 @@ class Configuration(object):
         if temp_mani:
             current_version = temp_mani.Sequence()
         try:
-            host_id = open("/etc/hostid").read().rstrip()
+            with open("/etc/hostid") as f:
+                host_id = f.read().rstrip()
         except:
             host_id = None
 
