@@ -814,7 +814,7 @@ class Configuration(object):
 
         for line in fileref:
             import re
-            line = line.rstrip()
+            line = line.decode('utf8').rstrip()
             # Ignore comments
             if line.startswith("#"):
                 continue
