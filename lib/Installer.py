@@ -144,12 +144,11 @@ def RemoveFile(path):
         pass
     try:
         os.unlink(path)
-    except  os.error as e:
-        if e[0] == errno.ENOENT:
-            return True
-        else:
-            if debug: log.debug("RemoveFile(%s):  errno = %d" % (path, e[0]))
-            return False
+    except FileNotFoundError:
+        return True
+    except OSError as e:
+        if debug: log.debug("RemoveFile(%s):  errno = %d" % (path, e[0]))
+        return False
     if os.path.exists(path):
         raise Exception("After removal, %s still exists" % path)
     return True
