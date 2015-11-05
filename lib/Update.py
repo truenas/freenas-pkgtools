@@ -1234,7 +1234,7 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
             # RunCommand("/sbin/zpool", ["scrub", "freenas-boot"])
     except BaseException as e:
         # Cleanup code is entirely different for reboot vs non reboot
-        log.error("Update got exception during update: %s" % str(e))
+        log.error("Update got exception during update: %s", e, exc_info=True)
         if reboot:
             if mount_point:
                 UnmountClone(new_boot_name, mount_point)
