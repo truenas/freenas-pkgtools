@@ -1315,7 +1315,8 @@ def VerifyUpdate(directory):
     
     # First easy thing to do:  look for the SEQUENCE file.
     try:
-        cached_sequence = open(directory + "/SEQUENCE", "r").read().rstrip()
+        with open(directory + "/SEQUENCE", "r") as f:
+            cached_sequence = f.read().rstrip()
     except (IOError, Exception) as e:
         log.error("Could not open sequence file in cache directory %s: %s" % (directory, str(e)))
         raise UpdateIncompleteCacheException("Cache directory %s does not have a sequence file" % directory)
@@ -1330,7 +1331,8 @@ def VerifyUpdate(directory):
     # name we're using
     cached_server = "default"
     try:
-        cached_server = open(directory + "/SERVER", "r").read().rstrip()
+        with open(directory + "/SERVER", "r") as f:
+            cached_server = f.read().rstrip()
     except (IOError, Exception) as e:
         log.debug("Could not open SERVER file in cache direcory %s: %s" % (directory, str(e)))
         cached_server = "default"
