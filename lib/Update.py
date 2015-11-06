@@ -394,7 +394,7 @@ zfs inherit -r beadm:nickname freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
 zfs destroy -r freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}	
 """
 
-def CreateClone(name, snap_grub=True, bename=None, rename=None):
+def CreateClone(name, bename=None, rename=None):
     # Create a boot environment from the current
     # root, using the given name.  Returns False
     # if it could not create it
@@ -453,14 +453,6 @@ def CreateClone(name, snap_grub=True, bename=None, rename=None):
             RunCommand(beadm, args)
             return False
         
-    if snap_grub:
-        # Also create a snapshot of the grub filesystem,
-        # but we don't do anything with it
-        zfs = "/sbin/zfs"
-        args = ["snapshot", _grub_snapshot(name)]
-        if RunCommand(zfs, args) is False:
-            log.debug("Unable to create grub snapshot Pre-Upgrade-%s", name)
-
     return True
 
 
