@@ -147,7 +147,7 @@ def RemoveFile(path):
     except FileNotFoundError:
         return True
     except OSError as e:
-        if debug: log.debug("RemoveFile(%s):  errno = %d" % (path, e[0]))
+        if debug: log.debug("RemoveFile(%s):  errno = %d" % (path, e.errno))
         return False
     if os.path.exists(path):
         raise Exception("After removal, %s still exists" % path)
@@ -188,7 +188,7 @@ def SetPosix(path, meta):
         os.lchown(path, meta[TAR_UID_KEY], meta[TAR_GID_KEY])
     except os.error as e:
         # If we're not root, we can't do the chown
-        if e[0] != errno.EPERM and amroot:
+        if e.errno != errno.EPERM and amroot:
             raise e
     os.lchmod(path, meta[TAR_MODE_KEY])
     if meta[TAR_FLAGS_KEY] != 0:
@@ -196,7 +196,7 @@ def SetPosix(path, meta):
             os.lchflags(path, meta[TAR_FLAGS_KEY])
         except os.error as e:
             # If we're not root, we can't do some of this, either
-            if e[0] != errno.EPERM and amroot:
+            if e.errno != errno.EPERM and amroot:
                 raise e
 
 def EntryInDictionary(name, mDict, prefix):
@@ -544,7 +544,7 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
                         log.error("Couldn't copy %s to %s" % (source_file, full_path))
                         raise
                 else:
-                    log.error("Couldn't link %s to %s: %s" % (source_file, full_path, e[0]))
+                    log.error("Couldn't link %s to %s: %s" % (source_file, full_path, e.strerror))
                     raise e
             if st.st_flags != 0:
                 os.lchflags(source_file, st.st_flags)
