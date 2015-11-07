@@ -587,8 +587,8 @@ class Configuration(object):
                 req.add_header("Range", "bytes=%d-" % read)
             
             furl = opener.open(req, timeout=30)
-        except urllib2.HTTPError as error:
-            if error.code == httplib.REQUESTED_RANGE_NOT_SATISFIABLE:
+        except urllib.error.HTTPError as error:
+            if error.code == http.client.REQUESTED_RANGE_NOT_SATISFIABLE:
                 # We've reached the end of the file already
                 # Do I need to do something different for the progress handler?
                 retval.seek(0)
