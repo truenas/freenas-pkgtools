@@ -599,7 +599,7 @@ class Configuration(object):
             log.error("Unable to load %s: %s", file_url, str(e))
             return None
         try:
-            totalsize = int(furl.info().getheader('Content-Length').strip())
+            totalsize = int(furl.info().get('Content-Length').strip())
         except:
             totalsize = None
 
