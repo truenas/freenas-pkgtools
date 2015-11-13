@@ -9,7 +9,6 @@ import urllib.request, urllib.error, urllib.parse
 import http.client
 import socket
 import ssl
-import sqlite3
 
 from . import Avatar, UPDATE_SERVER
 from . import Exceptions
@@ -204,6 +203,7 @@ class PackageDB:
         return
 
     def _connectdb(self, returniferror=False, cursor=False):
+        import sqlite3
         if self.__conn is not None:
             if cursor:
                 return self.__conn.cursor()
