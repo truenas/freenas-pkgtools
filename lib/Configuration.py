@@ -17,7 +17,6 @@ from . import Installer
 from . import Train
 from . import Package
 from . import Manifest
-from .Update import PkgFileDeltaOnly, PkgFileFullOnly
 
 from stat import (
     S_ISDIR, S_ISCHR, S_ISBLK, S_ISREG, S_ISFIFO, S_ISLNK, S_ISSOCK,
@@ -1007,6 +1006,9 @@ class Configuration(object):
         # We have at least one, and at most two, files
         # to look for.
         # The first file is the full package.
+
+        # Leave this local import here as otherwise it causes circular import issues
+        from .Update import PkgFileDeltaOnly, PkgFileFullOnly
         package_files = []
         if pkg_type is not PkgFileDeltaOnly:
             package_files.append({"Filename": package.FileName(), "Checksum": package.Checksum()})
