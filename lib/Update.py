@@ -5,14 +5,17 @@ import os
 import signal
 import subprocess
 import sys
+import random
 
 from . import Avatar
 import freenasOS.Manifest as Manifest
 import freenasOS.Configuration as Configuration
 import freenasOS.Installer as Installer
-from freenasOS.Exceptions import UpdateIncompleteCacheException, UpdateInvalidCacheException, UpdateBusyCacheException, UpdateBootEnvironmentException, UpdatePackageException, UpdateSnapshotException
-
-from freenasOS.Exceptions import ManifestInvalidSignature, UpdateManifestNotFound
+from freenasOS.Exceptions import (
+    UpdateIncompleteCacheException, UpdateInvalidCacheException, UpdateBusyCacheException,
+    UpdateBootEnvironmentException, UpdatePackageException, UpdateSnapshotException,
+    ManifestInvalidSignature, UpdateManifestNotFound
+)
 
 log = logging.getLogger('freenasOS.Update')
 
@@ -33,57 +36,59 @@ PkgFileFullOnly = "full-only"
 
 
 SERVICES = {
-    "gui" : {
-        "Name" : "gui",
+    "gui": {
+        "Name": "gui",
         "ServiceName": "gui",
         "Description": "Restart Web UI (forces a logout)",
-        "CheckStatus" : False,
+        "CheckStatus": False,
     },
-    "SMB" : {
-        "Name" : "CIFS",
-        "ServiceName" : "cifs",
-        "Description" : "Restart CIFS sharing",
-        "CheckStatus" : True,
+    "SMB": {
+        "Name": "CIFS",
+        "ServiceName": "cifs",
+        "Description": "Restart CIFS sharing",
+        "CheckStatus": True,
     },
-    "AFP" : {
-        "Name" : "AFP",
-        "ServiceName" : "afp",
-        "Description" : "Restart AFP sharing",
-        "CheckStatus" : True,
+    "AFP": {
+        "Name": "AFP",
+        "ServiceName": "afp",
+        "Description": "Restart AFP sharing",
+        "CheckStatus": True,
     },
-    "NFS" : {
-        "Name" : "NFS",
-        "ServiceName" : "nfs",
-        "Description" : "Restart NFS sharing",
-        "CheckStatus" : True,
+    "NFS": {
+        "Name": "NFS",
+        "ServiceName": "nfs",
+        "Description": "Restart NFS sharing",
+        "CheckStatus": True,
     },
-    "iSCSI" : {
-        "Name" : "iSCSI",
-        "ServiceName" : "iscsitarget",
-        "Description" : "Restart iSCSI services",
-        "CheckStatus" : True,
+    "iSCSI": {
+        "Name": "iSCSI",
+        "ServiceName": "iscsitarget",
+        "Description": "Restart iSCSI services",
+        "CheckStatus": True,
     },
-    "FTP" : {
-        "Name" : "FTP",
-        "ServiceName" : "ftp",
-        "Description" : "Restart FTP services",
-        "CheckStatus" : True,
+    "FTP": {
+        "Name": "FTP",
+        "ServiceName": "ftp",
+        "Description": "Restart FTP services",
+        "CheckStatus": True,
     },
-    "WebDAV" : {
+    "WebDAV": {
         "Name": "WebDAV",
-        "ServiceName" : "webdav",
-        "Description" : "Restart WebDAV services",
-        "CheckStatus" : True,
+        "ServiceName": "webdav",
+        "Description": "Restart WebDAV services",
+        "CheckStatus": True,
     },
-# Not sure what DirectoryServices would be
-#    "DirectoryServices" : {
-#        "Name" : "Restart directory services",
+    # Not sure what DirectoryServices would be
+    #    "DirectoryServices" : {
+    #        "Name" : "Restart directory services",
 }
 
+
 def GetServiceDescription(svc):
-    if not svc in SERVICES:
+    if svc not in SERVICES:
         return None
     return SERVICES[svc]["Description"]
+
 
 def VerifyServices(svc_names):
     """
@@ -91,9 +96,10 @@ def VerifyServices(svc_names):
     This is a trivial wrapper for now.
     """
     for name in svc_names:
-        if not name in SERVICES:
+        if name not in SERVICES:
             return False
     return True
+
 
 def StopServices(svc_list):
     """
@@ -141,17 +147,20 @@ beadm = "/usr/local/sbin/beadm"
 grub_dir = "/boot/grub"
 grub_cfg = "/boot/grub/grub.cfg"
 freenas_pool = "freenas-boot"
+
+
 def _grub_snapshot(name):
-    return "%s/grub@Pre-Upgrade-%s" % (freenas_pool, name)
+    return "{0}/grub@Pre-Upgrade-{1}".format(freenas_pool, name)
+
 
 def RunCommand(command, args):
     # Run the given command.  Uses subprocess module.
     # Returns True if the command exited with 0, or
     # False otherwise.
-    import subprocess
 
-    proc_args = [ command ]
-    if args is not None:  proc_args.extend(args)
+    proc_args = [command]
+    if args is not None:
+        proc_args.extend(args)
     log.debug("RunCommand(%s, %s)" % (command, args))
     if debug:
         print(proc_args, file=sys.stderr)
@@ -173,6 +182,7 @@ def RunCommand(command, args):
         return True
     else:
         return False
+
 
 def GetRootDataset():
     # Returns the name of the root dataset.
@@ -199,7 +209,8 @@ def GetRootDataset():
         return None
     rv = lines[1].split()[0]
     return rv
-                                                                                                                
+
+
 def CloneSetAttr(clone, **kwargs):
     """
     Given a clone, set attributes defined in kwargs.
@@ -220,7 +231,8 @@ def CloneSetAttr(clone, **kwargs):
         return True
     return False
 
-def PruneClones(cb = None):
+
+def PruneClones(cb=None):
     """
     Attempt to prune boot environments based on age.
     It will try deleting BEs until either:
@@ -230,7 +242,7 @@ def PruneClones(cb = None):
     If cb is not None, it will be called with something.
 
     """
-    def PoolInfo(pool_name = "freenas-boot"):
+    def PoolInfo(pool_name="freenas-boot"):
         """
         Return some info about the pool, namely the
         amount of available space and the amount of used
@@ -253,6 +265,7 @@ def PruneClones(cb = None):
         if ((used * 100.0) / size) < 80.0:
             return False
         return True
+
     def DCW(be):
         """
         Dead Clone Walking:  return true if the
@@ -263,7 +276,9 @@ def PruneClones(cb = None):
         as well, but log it.
         """
         if "keep" not in be:
-            log.debug("Cannot prune clone {0} since it is missing a keep option".format(be["name"]))
+            log.debug(
+                "Cannot prune clone {0} since it is missing a keep option".format(be["name"])
+            )
             return False
         if be["keep"] is None:
             log.debug("Cannot prune clone {0} since keep is None".format(be["name"]))
@@ -274,10 +289,12 @@ def PruneClones(cb = None):
             log.debug("Cannot prune clone {0} since it is mounted at {1}".format(be["name"], be["mountpoint"]))
             return False
         if be["active"] != "-":
-            log.debug("Cannot prune clone {0} since it is active {1}".format(be["name"], be["active"]))
+            log.debug(
+                "Cannot prune clone {0} since it is active {1}".format(be["name"], be["active"])
+            )
             return False
         return True
-    
+
     (size, used) = PoolInfo()
     if size is None:
         log.error("Cannot get pool information, not pruning")
@@ -285,10 +302,9 @@ def PruneClones(cb = None):
     if PruneDone(size, used):
         log.debug("No pruning necessary")
         return True
-    clones = sorted(ListClones(), key = lambda be: be["created"])
+    clones = sorted(ListClones(), key=lambda be: be["created"])
     for be in clones:
         # Check if clone is eligible.
-        # 
         if DCW(be):
             log.debug("I want to get rid of clone %s" % be["name"])
             if DeleteClone(be["realname"]) is True:
@@ -305,9 +321,10 @@ def PruneClones(cb = None):
         else:
             log.debug("Clone %s not eligible for pruning" % be["realname"])
         # Next BE, please
-        
+
     log.debug("Done with prune loop.  Must have failed.")
     return False
+
 
 def ListClones():
     # Return a list of boot-environment clones.
@@ -315,7 +332,7 @@ def ListClones():
     # "beadm list -H"; it then gets a set of properties
     # for each BE.
     # Because of that, it can't use RunCommand
-    cmd = [beadm, "list", "-H" ]
+    cmd = [beadm, "list", "-H"]
     rv = []
     if debug:
         print(cmd, file=sys.stderr)
@@ -327,7 +344,7 @@ def ListClones():
         return None
     stdout, stderr = p.communicate()
     if p.returncode != 0:
-        log.error("`%s' returned %d" %( cmd, p.returncode))
+        log.error("`%s' returned %d" % (cmd, p.returncode))
         return None
 
     for line in stdout.decode('utf8').strip('\n').split('\n'):
@@ -336,7 +353,7 @@ def ListClones():
         if len(fields) > 5 and fields[5] != "-":
             name = fields[5]
         tdict = {
-            'realname' : fields[0],
+            'realname': fields[0],
             'name': name,
             'active': fields[1],
             'mountpoint': fields[2],
@@ -355,6 +372,7 @@ def ListClones():
             log.debug("Could not get beadm properties from dataset")
         rv.append(tdict)
     return rv
+
 
 def FindClone(name):
     """
@@ -383,16 +401,17 @@ zfs inherit -r beadm:nickname freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
 /beadm rename -n pre-{$NEW} ${CURRENT}
 
 # Failure
-	/beadm destroy -F ${CURRENT}
-	/beadm rename -n ${NEW} ${CURRENT}
-	zfs rollback freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
-	zfs set beadm:nickname=${CURRENT} freenas-boot/ROOT/${CURRENT}
+    /beadm destroy -F ${CURRENT}
+    /beadm rename -n ${NEW} ${CURRENT}
+    zfs rollback freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
+    zfs set beadm:nickname=${CURRENT} freenas-boot/ROOT/${CURRENT}
 # Success
-	/beadm activate ${NEW}	# Not sure that's necessary or will work
+    beadm activate ${NEW}	# Not sure that's necessary or will work
 
 # Either case
-zfs destroy -r freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}	
+zfs destroy -r freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
 """
+
 
 def CreateClone(name, bename=None, rename=None):
     # Create a boot environment from the current
@@ -419,7 +438,6 @@ def CreateClone(name, bename=None, rename=None):
         log.debug("FindClone returned %s" % cl)
         args.extend(["-e", cl["realname"]])
     if rename:
-        import random
         temp_name = "Pre-%s-%d" % (name, random.SystemRandom().randint(0, 1024 * 1024))
         args.append(temp_name)
         log.debug("CreateClone with rename, temp_name = %s" % temp_name)
@@ -452,7 +470,7 @@ def CreateClone(name, bename=None, rename=None):
             args = ["rename", name, rename]
             RunCommand(beadm, args)
             return False
-        
+
     return True
 
 
@@ -467,7 +485,7 @@ def RenameClone(oldname, newname):
     return True
 
 
-def MountClone(name, mountpoint = None):
+def MountClone(name, mountpoint=None):
     # Mount the given boot environment.  It will
     # create a random name in /tmp.  Returns the
     # name of the mountpoint, or None on error.
@@ -482,7 +500,7 @@ def MountClone(name, mountpoint = None):
 
     if mount_point is None:
         return None
-    args = ["mount", name, mount_point ]
+    args = ["mount", name, mount_point]
     rv = RunCommand(beadm, args)
     if rv is False:
         try:
@@ -511,25 +529,28 @@ def MountClone(name, mountpoint = None):
             UnmountClone(name, None)
             return None
         # Now let's mount devfs, tmpfs, and grub
-        args_array = [ ["-t", "devfs", "devfs", mount_point + "/dev"],
-                       ["-t", "tmpfs", "tmpfs", mount_point + "/var/tmp"],
-                       ["-t", "zfs", "freenas-boot/grub", mount_point + "/boot/grub" ]
-                       ]
+        args_array = [
+            ["-t", "devfs", "devfs", mount_point + "/dev"],
+            ["-t", "tmpfs", "tmpfs", mount_point + "/var/tmp"],
+            ["-t", "zfs", "freenas-boot/grub", mount_point + "/boot/grub"]
+        ]
         cmd = "/sbin/mount"
         for fs_args in args_array:
             rv = RunCommand(cmd, fs_args)
             if rv is False:
                 UnmountClone(name, None)
                 return None
-            
+
     return mount_point
+
 
 def ActivateClone(name):
     # Set the clone to be active for the next boot
     args = ["activate", name]
     return RunCommand(beadm, args)
 
-def UnmountClone(name, mount_point = None):
+
+def UnmountClone(name, mount_point=None):
     # Unmount the given clone.  After unmounting,
     # it removes the mount directory.
     # First thing we need to do is try to unmount
@@ -550,10 +571,10 @@ def UnmountClone(name, mount_point = None):
         for dir in ["/dev", "/var/tmp"]:
             args = ["-f", mount_point + dir]
             RunCommand(cmd, args)
-    
+
     # Now we ask beadm to unmount it.
     args = ["unmount", "-f", name]
-    
+
     if RunCommand(beadm, args) is False:
         return False
 
@@ -563,8 +584,9 @@ def UnmountClone(name, mount_point = None):
         except:
             pass
     return True
-        
-def DeleteClone(name, delete_grub = False):
+
+
+def DeleteClone(name, delete_grub=False):
     # Delete the clone we created.
     args = ["destroy", "-F", name]
     rv = RunCommand(beadm, args)
@@ -579,7 +601,8 @@ def DeleteClone(name, delete_grub = False):
 
     return rv
 
-def GetUpdateChanges(old_manifest, new_manifest, cache_dir = None):
+
+def GetUpdateChanges(old_manifest, new_manifest, cache_dir=None):
     """
     This is used by both PendingUpdatesChanges() and CheckForUpdates().
     The difference between the two is that the latter doesn't necessarily
@@ -599,15 +622,15 @@ def GetUpdateChanges(old_manifest, new_manifest, cache_dir = None):
             return base_list
         if isinstance(new_list, list):
             for svc in new_list:
-                if not svc in base_list:
+                if svc not in base_list:
                     base_list.append(svc)
         elif isinstance(new_list, dict):
             for svc, val in new_list.items():
                 if val:
-                    if not svc in base_list:
+                    if svc not in base_list:
                         base_list.append(svc)
         return base_list
-    
+
     svcs = []
     diffs = Manifest.DiffManifests(old_manifest, new_manifest)
     if len(diffs) == 0:
@@ -616,7 +639,7 @@ def GetUpdateChanges(old_manifest, new_manifest, cache_dir = None):
     reboot = False
     if REQUIRE_REBOOT:
         reboot = True
-        
+
     if "Packages" in diffs:
         # Look through the install/upgrade packages
         for pkg, op, old in diffs["Packages"]:
@@ -668,7 +691,8 @@ def GetUpdateChanges(old_manifest, new_manifest, cache_dir = None):
     diffs["Reboot"] = reboot
     return diffs
 
-def CheckForUpdates(handler = None, train = None, cache_dir = None, diff_handler = None):
+
+def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None):
     """
     Check for an updated manifest.  If cache_dir is none, then we try
     to download just the latest manifest for the given train, and
@@ -696,7 +720,7 @@ def CheckForUpdates(handler = None, train = None, cache_dir = None, diff_handler
             log.error("CheckForUpdate(train=%s, cache_dir = %s):  Got exception %s" % (train, cache_dir, str(e)))
             raise e
         # We always want a valid signature when doing an update
-        new_manifest = Manifest.Manifest(require_signature = True)
+        new_manifest = Manifest.Manifest(require_signature=True)
         try:
             new_manifest.LoadFile(mfile)
         except Exception as e:
@@ -704,7 +728,7 @@ def CheckForUpdates(handler = None, train = None, cache_dir = None, diff_handler
             raise e
     else:
         try:
-            new_manifest = conf.FindLatestManifest(train = train, require_signature = True)
+            new_manifest = conf.FindLatestManifest(train=train, require_signature=True)
         except Exception as e:
             log.error("Could not find latest manifest due to %s" % str(e))
 
@@ -713,7 +737,11 @@ def CheckForUpdates(handler = None, train = None, cache_dir = None, diff_handler
 
     # If new_manifest is not the requested train, then we don't have an update to do
     if train and train != new_manifest.Train():
-        log.debug("CheckForUpdate(train = %s, cache_dir = %s):  Wrong train in caache (%s)" % (train, cache_dir, new_manifest.Train()))
+        log.debug(
+            "CheckForUpdate(train = {0}, cache_dir = {1}):  Wrong train in cache ({2})".format(
+                train, cache_dir, new_manifest.Train()
+            )
+        )
         return None
 
     diffs = GetUpdateChanges(conf.SystemManifest(), new_manifest)
@@ -726,10 +754,11 @@ def CheckForUpdates(handler = None, train = None, cache_dir = None, diff_handler
                 handler(op, pkg, old)
     if diff_handler:
         diff_handler(diffs)
-        
+
     return new_manifest
 
-def DownloadUpdate(train, directory, get_handler = None, check_handler = None, pkg_type = None):
+
+def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_type=None):
     """
     Download, if necessary, the LATEST update for train; download
     delta packages if possible.  Checks to see if the existing content
@@ -745,7 +774,7 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
     mani = conf.SystemManifest()
     # First thing, let's get the latest manifest
     try:
-        latest_mani = conf.FindLatestManifest(train, require_signature = True)
+        latest_mani = conf.FindLatestManifest(train, require_signature=True)
     except ManifestInvalidSignature as e:
         log.error("Latest manifest has invalid signature: %s" % str(e))
         return False
@@ -765,7 +794,7 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
             log.debug("Possibly with no network, either no cached update or it is bad")
             return False
 
-    cache_mani = Manifest.Manifest(require_signature = True)
+    cache_mani = Manifest.Manifest(require_signature=True)
     try:
         mani_file = VerifyUpdate(directory)
         if mani_file:
@@ -805,7 +834,7 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
             mani_file.close()
             return False
 
-        temporary_manifest = Manifest.Manifest(require_signature = True)
+        temporary_manifest = Manifest.Manifest(require_signature=True)
         log.debug("Going to try loading manifest file now")
         temporary_manifest.LoadFile(mani_file)
         log.debug("Loaded manifest file")
@@ -816,7 +845,7 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
             mani_file = None
     except BaseException as e:
         log.debug("Got this exception: %s" % str(e))
-    
+
     if mani_file is None:
         try:
             os.makedirs(directory)
@@ -849,12 +878,12 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
         mani_file.close()
         return False
     log.debug("DownloadUpdate:  diffs = %s" % diffs)
-    
+
     download_packages = []
     reboot_required = True
     if "Reboot" in diffs:
         reboot_required = diffs["Reboot"]
-        
+
     if "Packages" in diffs:
         for pkg, op, old in diffs["Packages"]:
             if op == "delete":
@@ -863,14 +892,16 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
             download_packages.append(pkg)
 
     log.debug("Update does%s seem to require a reboot" % "" if reboot_required else " not")
-    
+
     # Next steps:  download the package files.
     for indx, pkg in enumerate(download_packages):
         # This is where we find out for real if a reboot is required.
         # To do that, we may need to know which update was downloaded.
         if check_handler:
-            check_handler(indx + 1,  pkg = pkg, pkgList = download_packages)
-        pkg_file = conf.FindPackageFile(pkg, save_dir = directory, handler = get_handler, pkg_type = pkg_type)
+            check_handler(indx + 1,  pkg=pkg, pkgList=download_packages)
+        pkg_file = conf.FindPackageFile(
+            pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type
+        )
         if pkg_file is None:
             log.error("Could not download package file for %s" % pkg.Name())
             RemoveUpdate(directory)
@@ -879,7 +910,7 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
 
     # Almost done:  get a changelog if one exists for the train
     # If we can't get it, we don't care.
-    conf.GetChangeLog(train, save_dir = directory, handler = get_handler)
+    conf.GetChangeLog(train, save_dir=directory, handler=get_handler)
     # Then save the manifest file.
     # Create the SEQUENCE file.
     with open(directory + "/SEQUENCE", "w") as f:
@@ -887,10 +918,11 @@ def DownloadUpdate(train, directory, get_handler = None, check_handler = None, p
     # And create the SERVER file.
     with open(directory + "/SERVER", "w") as f:
         f.write("%s" % conf.UpdateServerName())
-        
+
     # Then return True!
     mani_file.close()
     return True
+
 
 def PendingUpdates(directory):
     import traceback
@@ -904,7 +936,8 @@ def PendingUpdates(directory):
         log.debug("PendingUpdatesChanges raised exception %s" % sys.exc_info()[0])
         traceback.print_exc()
         return False
-    
+
+
 def PendingUpdatesChanges(directory):
     """
     Return a list (a la CheckForUpdates handler right now) of
@@ -934,7 +967,7 @@ def PendingUpdatesChanges(directory):
         log.error("Got exception %s while trying to determine pending updates" % str(e))
         raise
     if mani_file:
-        new_manifest = Manifest.Manifest(require_signature = True)
+        new_manifest = Manifest.Manifest(require_signature=True)
         try:
             new_manifest.LoadFile(mani_file)
         except ManifestInvalidSignature as e:
@@ -947,10 +980,11 @@ def PendingUpdatesChanges(directory):
         # updates if that's what got downloaded.
         # By definition, if there are no Packages differences, a reboot
         # isn't required.
-        diffs = GetUpdateChanges(conf.SystemManifest(), new_manifest, cache_dir = directory)
+        diffs = GetUpdateChanges(conf.SystemManifest(), new_manifest, cache_dir=directory)
         return diffs
     else:
         return None
+
 
 def ServiceRestarts(directory):
     """
@@ -991,12 +1025,13 @@ def ServiceRestarts(directory):
 
                 if svcs:
                     for svc in svcs:
-                        if not svc in retval:
+                        if svc not in retval:
                             retval.append(svc)
-                                
+
     return retval
-                    
-def ApplyUpdate(directory, install_handler = None, force_reboot = False):
+
+
+def ApplyUpdate(directory, install_handler=None, force_reboot=False):
     """
     Apply the update in <directory>.  As with PendingUpdates(), it will
     have to verify the contents before it actually installs them, so
@@ -1006,13 +1041,13 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
     conf = Configuration.Configuration()
     # Note that PendingUpdates may raise an exception
     changes = PendingUpdatesChanges(directory)
-        
+
     if changes is None:
         # This means no updates to apply, and so nothing to do.
         return None
 
     # Do I have to worry about a race condition here?
-    new_manifest = Manifest.Manifest(require_signature = True)
+    new_manifest = Manifest.Manifest(require_signature=True)
     try:
         new_manifest.LoadPath(directory + "/MANIFEST")
     except ManifestInvalidSignature as e:
@@ -1058,9 +1093,9 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
         new_boot_name = new_manifest.Sequence()
     else:
         new_boot_name = "%s-%s" % (Avatar(), new_manifest.Sequence())
-        
+
     log.debug("new_boot_name = %s, reboot = %s" % (new_boot_name, reboot))
-    
+
     mount_point = None
     if reboot:
         # Need to create a new boot environment
@@ -1093,7 +1128,7 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
                             break
                     if found is False:
                         s = "Unable to create boot-environment %s" % new_boot_name
-                else:    
+                else:
                     log.debug("Unable to list clones after creation failure")
                     s = "Unable to create boot-environment %s" % new_boot_name
                 if s:
@@ -1133,39 +1168,41 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
         if root_env is None:
             log.error("Unable to find root BE!")
             raise UpdateBootEnvironmentException("Unable to find root BE!")
-        
+
         # Now we want to snapshot the current boot environment,
         # so we can rollback as needed.
         snapshot_name = "%s@Pre-Uprgade-%s" % (root_dataset, new_manifest.Sequence())
         cmd = "/sbin/zfs"
-        args = ["snapshot", "-r", snapshot_name ]
+        args = ["snapshot", "-r", snapshot_name]
         rv = RunCommand(cmd, args)
         if rv is False:
             log.error("Unable to create snapshot %s, bailing for now" % snapshot_name)
             raise UpdateSnapshotException("Unable to create snapshot %s" % snapshot_name)
         # We need to remove the beadm:nickname property.  I hate knowing this much
         # about the implementation
-        args = ["inherit", "-r", "beadm:nickname", snapshot_name ]
+        args = ["inherit", "-r", "beadm:nickname", snapshot_name]
         RunCommand(cmd, args)
-        
+
         # At this point, we'd want to rename the boot environment to be the new
         # name, which would be new_manifest.Sequence()
-        if CreateClone(new_boot_name, rename = root_env["name"]) is False:
+        if CreateClone(new_boot_name, rename=root_env["name"]) is False:
             log.error("Unable to create new boot environment %s" % new_boot_name)
             # Roll back and destroy the snapshot we took
             cmd = "/sbin/zfs"
-            args = ["rollback", snapshot_name ]
+            args = ["rollback", snapshot_name]
             RunCommand(cmd, args)
             args[0] = "destroy"
             RunCommand(cmd, args)
             # And set the beadm:nickname property back
             args = ["set", "beadm:nickname=%s" % root_env["name"]]
             RunCommand(cmd, args)
-            
-            raise UpdateBootEnvironmentException("Unable to create new boot environment %s" % new_boot_name)
+
+            raise UpdateBootEnvironmentException(
+                "Unable to create new boot environment {0}".format(new_boot_name)
+            )
         if "Restart" in changes:
             service_list = StopServices(changes["Restart"])
-            
+
     # Now we start doing the update!
     # If we have to reboot, then we need to
     # make a new boot environment, with the appropriate name.
@@ -1173,7 +1210,7 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
     # current one with the appropriate name, while at the same
     # time cloning the current one and keeping the existing name.
     # Easy peasy, right?
-    
+
     try:
         # Remove any deleted packages
         for pkg in deleted_packages:
@@ -1187,14 +1224,16 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
                 raise UpdatePackageException(s)
             conf.PackageDB(mount_point).RemovePackage(pkg.Name())
 
-        installer = Installer.Installer(manifest = new_manifest,
-                                        root = mount_point,
-                                        config = conf)
-        installer.GetPackages(pkgList = updated_packages)
+        installer = Installer.Installer(
+            manifest=new_manifest,
+            root=mount_point,
+            config=conf
+        )
+        installer.GetPackages(pkgList=updated_packages)
         log.debug("Installer got packages %s" % installer._packages)
         # Now to start installing them
         rv = False
-        if installer.InstallPackages(handler = install_handler) is False:
+        if installer.InstallPackages(handler=install_handler) is False:
             log.error("Unable to install packages")
             raise UpdatePackageException("Unable to install packages")
         else:
@@ -1218,7 +1257,7 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
                     service_list = None
                 # Clean up the emergency holographic snapshot
                 cmd = "/sbin/zfs"
-                args = ["destroy", "-r", snapshot_name ]
+                args = ["destroy", "-r", snapshot_name]
                 rv = RunCommand(cmd, args)
                 if rv is False:
                     log.error("Unable to destroy snapshot %s" % snapshot_name)
@@ -1244,7 +1283,7 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
                 if rv:
                     # Now roll back the snapshot, and set the beadm:nickname value
                     cmd = "/sbin/zfs"
-                    args = [ "rollback", "-r", snapshot_name]
+                    args = ["rollback", "-r", snapshot_name]
                     rv = RunCommand(cmd, args)
                     if rv is False:
                         log.error("Unable to rollback %s" % snapshot_name)
@@ -1262,6 +1301,7 @@ def ApplyUpdate(directory, install_handler = None, force_reboot = False):
         raise e
 
     return reboot
+
 
 def VerifyUpdate(directory):
     """
@@ -1297,23 +1337,24 @@ def VerifyUpdate(directory):
         # Throw an incomplete exception
         raise UpdateBusyCacheException("Cache directory %s is being modified" % directory)
     # We always want a valid signature for an update.
-    cached_mani = Manifest.Manifest(require_signature = True)
+    cached_mani = Manifest.Manifest(require_signature=True)
     try:
         cached_mani.LoadFile(mani_file)
     except Exception as e:
         # If we got an exception, it's invalid.
         log.error("Could not load cached manifest file: %s" % str(e))
         raise UpdateInvalidCacheException
-    
+
     # First easy thing to do:  look for the SEQUENCE file.
     try:
         with open(directory + "/SEQUENCE", "r") as f:
             cached_sequence = f.read().rstrip()
     except (IOError, Exception) as e:
         log.error("Could not open sequence file in cache directory %s: %s" % (directory, str(e)))
-        raise UpdateIncompleteCacheException("Cache directory %s does not have a sequence file" % directory)
+        raise UpdateIncompleteCacheException(
+            "Cache directory {0} does not have a sequence file".format(directory)
+        )
 
-        
     # Now let's see if the sequence matches us.
     if cached_sequence != mani.Sequence():
         log.error("Cached sequence, %s, does not match system sequence, %s" % (cached_sequence, mani.Sequence()))
@@ -1332,7 +1373,7 @@ def VerifyUpdate(directory):
     if cached_server != conf.UpdateServerName():
         log.error("Cached server, %s, does not match system update server, %s" % (cached_server, conf.UpdateServerName()))
         raise UpdateInvalidCacheException("Cached server name does not match system update server")
-    
+
     # Next thing to do is go through the manifest, and decide which package files we need.
     diffs = Manifest.DiffManifests(mani, cached_mani)
     # This gives us an array to examine.
@@ -1353,8 +1394,12 @@ def VerifyUpdate(directory):
             if not os.path.exists(directory + "/" + pkg.FileName())  and \
                not os.path.exists(directory + "/" + pkg.FileName(cur_vers)):
                 # Neither exists, so incoplete
-                log.error("Cache %s  directory missing files for package %s" % (directory, pkg.Name()))
-                raise UpdateIncompleteCacheException("Cache directory %s missing files for package %s" % (directory, pkg.Name()))
+                log.error(
+                    "Cache %s  directory missing files for package %s" % (directory, pkg.Name())
+                )
+                raise UpdateIncompleteCacheException(
+                    "Cache directory {0} missing files for package {1}".format(directory, pkg.Name())
+                )
             # Okay, at least one of them exists.
             # Let's try the full file first
             try:
@@ -1372,7 +1417,7 @@ def VerifyUpdate(directory):
                 e = "Cache directory %s missing files for package %s" % (directory, pkg.Name())
                 log.error(e)
                 raise UpdateIncompleteCacheException(e)
-        
+
             # Now we try the delta file
             # To do that, we need to find the right dictionary in the pkg
             upd_cksum = None
@@ -1396,6 +1441,7 @@ def VerifyUpdate(directory):
     # and the sequence tag is correct.
     mani_file.seek(0)
     return mani_file
+
 
 def RemoveUpdate(directory):
     import shutil

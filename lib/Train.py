@@ -9,7 +9,7 @@ class Train(object):
     _notice = None
     _update = False
 
-    def __init__(self, name, description = None, sequence = None, checked = None):
+    def __init__(self, name, description=None, sequence=None, checked=None):
         self._name = name
         self._descr = description
         self._seqno = sequence
@@ -18,9 +18,12 @@ class Train(object):
 
     def __repr__(self):
         retval = "Train('%s'" % self._name
-        if self._descr: retval += ", '%s'" % self._descr
-        if self._seqno: retval += ", '%s'" % self._seqno
-        if self._time: retval += ", '%s'" % self._time
+        if self._descr:
+            retval += ", '%s'" % self._descr
+        if self._seqno:
+            retval += ", '%s'" % self._seqno
+        if self._time:
+            retval += ", '%s'" % self._time
         retval += ")"
         return retval
 
@@ -44,7 +47,7 @@ class Train(object):
     def LastCheckedTime(self):
         return self._time
 
-    def SetLastCheckedTime(self, time = str(int(time.time()))):
+    def SetLastCheckedTime(self, time=str(int(time.time()))):
         self._time = time
         return
 
@@ -65,4 +68,3 @@ class Train(object):
 
     def UpdateAvailable(self):
         return self._update
-

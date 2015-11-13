@@ -6,6 +6,7 @@ UPGRADES_KEY = "Upgrades"
 REBOOT_KEY = "RequiresReboot"
 SERVICES_KEY = "RestartServices"
 
+
 class Package(object):
     _name = None
     _version = None
@@ -14,8 +15,9 @@ class Package(object):
     _updates = None
     _dirty = False
     _services = None
-    
+
     class PackageUpdate(object):
+
         def __init__(self, pkg, dict):
             self._dict = dict
             self._base = pkg
@@ -30,7 +32,7 @@ class Package(object):
             if CHECKSUM_KEY in self._dict:
                 return self._dict[CHECKSUM_KEY]
             return None
-        
+
         def Size(self):
             if SIZE_KEY in self._dict:
                 return self._dict[SIZE_KEY]
@@ -48,13 +50,13 @@ class Package(object):
 
         def SetRequiresReboot(self, rr):
             self._dict[REBOOT_KEY] = bool(rr)
-            
+
         def SetRestartServices(self, rs):
             self._dict[SERVICES_KEY] = rs
             if not rs:
                 self._dict.pop(SERVICES_KEY)
 
-        def RestartServices(self, raw = False):
+        def RestartServices(self, raw=False):
             """
             The list of restart services for an update is
             different from the main package component:  the
@@ -78,7 +80,7 @@ class Package(object):
                         if svc in tmpSet:
                             tmpSet.remove(svc)
             return list(tmpSet)
-            
+
     def __init__(self, *args):
         self._dict = {}
         # We can be called with a dictionary, or with (name, version, checksum)
@@ -93,11 +95,15 @@ class Package(object):
                 else:
                     self._dict[k] = tdict[k]
         else:
-            if len(args) > 0: self.SetName(args[0])
-            if len(args) > 1: self.SetVersion(args[1])
-            if len(args) > 2: self.SetChecksum(args[2])
-            if len(args) > 3:  self.SetRequiresReboot(args[3])
-            
+            if len(args) > 0:
+                self.SetName(args[0])
+            if len(args) > 1:
+                self.SetVersion(args[1])
+            if len(args) > 2:
+                self.SetChecksum(args[2])
+            if len(args) > 3:
+                self.SetRequiresReboot(args[3])
+
         return
 
     def dict(self):
@@ -146,11 +152,12 @@ class Package(object):
                 self.AddUpdate(upd[VERSION_KEY], upd[CHECKSUM_KEY], size)
         return
 
-    def AddUpdate(self, old, checksum, size = None, RequiresReboot = None):
+    def AddUpdate(self, old, checksum, size=None, RequiresReboot=None):
         if UPGRADES_KEY not in self._dict:
             self._dict[UPGRADES_KEY] = []
-        t = { VERSION_KEY : old, CHECKSUM_KEY : checksum }
-        if size is not None: t[SIZE_KEY] = size
+        t = {VERSION_KEY: old, CHECKSUM_KEY: checksum}
+        if size is not None:
+            t[SIZE_KEY] = size
         if RequiresReboot is not None:
             if self.RequiresReboot() != RequiresReboot:
                 t[REBOOT_KEY] = RequiresReboot
@@ -173,8 +180,8 @@ class Package(object):
                 if upd.Version() == old_version:
                     return upd
         return None
-    
-    def FileName(self, old = None):
+
+    def FileName(self, old=None):
         # Very simple function, simply concatenate name, version.
         # Format is <name>-<version>.tgz, or
         # <name>-<old>-<version>.tgz if old is not None.
@@ -189,14 +196,14 @@ class Package(object):
         # If not set, we default to yes, it requires a reboot
         return True
 
-    def SetRequiresReboot(self, val = True):
+    def SetRequiresReboot(self, val=True):
         self._dict[REBOOT_KEY] = val
-        
+
     def SetRestartServices(self, rs):
         self._dict[SERVICES_KEY] = rs
         if not rs:
             self._dict.pop(SERVICES_KEY)
-            
+
     def RestartServices(self):
         """
         Unlike the PackageUpdate class, this

@@ -7,30 +7,35 @@ import tarfile
 import hashlib
 import logging
 import tempfile
+import stat
 
 debug = 0
 verbose = False
 
 log = logging.getLogger('freenasOS.Installer')
 
+
 class InstallerConfigurationException(Exception):
     pass
+
 
 class InstallerPackageNotFoundException(Exception):
     pass
 
+
 class InstallerInsufficientSpaceException(Exception):
     pass
 
+
 class InstallerUnknownFileTypeException(Exception):
     pass
+
 
 class InstallerUnknownDeltaStyleException(Exception):
     pass
 
 # A list of architectures we consider valid.
-        
-pkg_valid_archs = [ "freebsd:9:x86:64", "freebsd:10:x86:64" ]
+pkg_valid_archs = ["freebsd:9:x86:64", "freebsd:10:x86:64"]
 # Some constants for the manifest JSON.
 # The ones we care about (for now) are
 # the package name, version, set of files, set
@@ -55,53 +60,66 @@ PKG_DELTA_STYLE_KEY = "style"
 PKG_MANIFEST_NAME = "+MANIFEST"
 
 # These are the keys for the scripts
-PKG_SCRIPTS = [ "pre-install", "install", "post-install",
-                "pre-deinstall", "deinstall", "post-deinstall",
-                "pre-upgrade", "upgrade", "post-upgrade",
-                "pre-delta", "post-delta"
-            ]
-        
+PKG_SCRIPTS = [
+    "pre-install",
+    "install",
+    "post-install",
+    "pre-deinstall",
+    "deinstall",
+    "post-deinstall",
+    "pre-upgrade",
+    "upgrade",
+    "post-upgrade",
+    "pre-delta",
+    "post-delta"
+]
+
+
 def enum(**enums):
     return type('Enum', (), enums)
 
-PKG_SCRIPT_TYPES = enum(PKG_SCRIPT_PRE_DEINSTALL = "pre-deinstall",
-                        PKG_SCRIPT_DEINSTALL = "deinstall",
-                        PKG_SCRIPT_POST_DEINSTALL = "post-deinstall",
-                        PKG_SCRIPT_PRE_INSTALL = "pre-install",
-                        PKG_SCRIPT_INSTALL = "install",
-                        PKG_SCRIPT_POST_INSTALL = "post-install",
-                        PKG_SCRIPT_PRE_UPGRADE = "pre-upgrade",
-                        PKG_SCRIPT_UPGRADE = "upgrade",
-                        PKG_SCRIPT_POST_UPGRADE = "post-upgrade",
-                        PKG_SCRIPT_PRE_DELTA = "pre-delta",
-                        PKG_SCRIPT_POST_DELTA = "post-delta",
-                    )
+PKG_SCRIPT_TYPES = enum(
+    PKG_SCRIPT_PRE_DEINSTALL="pre-deinstall",
+    PKG_SCRIPT_DEINSTALL="deinstall",
+    PKG_SCRIPT_POST_DEINSTALL="post-deinstall",
+    PKG_SCRIPT_PRE_INSTALL="pre-install",
+    PKG_SCRIPT_INSTALL="install",
+    PKG_SCRIPT_POST_INSTALL="post-install",
+    PKG_SCRIPT_PRE_UPGRADE="pre-upgrade",
+    PKG_SCRIPT_UPGRADE="upgrade",
+    PKG_SCRIPT_POST_UPGRADE="post-upgrade",
+    PKG_SCRIPT_PRE_DELTA="pre-delta",
+    PKG_SCRIPT_POST_DELTA="post-delta",
+)
 
-SCRIPT_INSTALL = [ ["pre_install"],
-                   ["install", "PRE-INSTALL"],
-                   ["post_install"],
-                   ["install", "POST-INSTALL"],
-                   ]
-SCRIPT_UPGRADE = [ ["pre_upgrade"],
-                   ["upgrade", "PRE-UPGRADE"],
-                   ["post_upgrade"],
-                   ["upgrade", "POST-UPGRADE"],
-                   ]
+SCRIPT_INSTALL = [
+    ["pre_install"],
+    ["install", "PRE-INSTALL"],
+    ["post_install"],
+    ["install", "POST-INSTALL"],
+]
+
+SCRIPT_UPGRADE = [
+    ["pre_upgrade"],
+    ["upgrade", "PRE-UPGRADE"],
+    ["post_upgrade"],
+    ["upgrade", "POST-UPGRADE"],
+]
 
 """
 This is how installs should be done, according to the pkgng wiki:
-                        
+
 Installing a package with pkgng
-                        
+
         execute pre_install script if any exists
         execute install script with PRE-INSTALL argument
         extract files directly to the right place
         extract directories directly to the right place
         execute post_install script if any exists
         execute install script with POST-INSTALL arguments
-    
+
 Deinstalling a package with pkgng
-        
+
         execute pre_deinstall script if any exists
         execute deinstall script with DEINSTALL argument
         removes files
@@ -121,17 +139,19 @@ If both the installed package and the new package are upgrade aware:
         extract files and directories from the new package
         execute post_upgrade script from the new package
         execute upgrade script with POST-UPGRADE argument from the new package
-        
+
 otherwise if falls back to the dumb way:
 
         deinstall the old package
         install the new one
-                        
+
 SEF:  This would require keeping old manifest file around.
 Also, I don't think removing the files works too well with us.  Certainly
 can't remove the directories from the base-os package!  I also do not see how
 it works in the pkgng code.
 """
+
+
 #
 # Remove a file.  This will first try to do an
 # unlink, then try to change flags if there are
@@ -147,11 +167,13 @@ def RemoveFile(path):
     except FileNotFoundError:
         return True
     except OSError as e:
-        if debug: log.debug("RemoveFile(%s):  errno = %d" % (path, e.errno))
+        if debug:
+            log.debug("RemoveFile(%s):  errno = %d" % (path, e.errno))
         return False
     if os.path.exists(path):
         raise Exception("After removal, %s still exists" % path)
     return True
+
 
 # Like the above, but for a directory.
 def RemoveDirectory(path):
@@ -175,12 +197,14 @@ def RemoveDirectory(path):
         return False
     return True
 
+
 def MakeDirs(dir):
     try:
         os.makedirs(dir, 0o755)
     except:
         pass
     return
+
 
 def SetPosix(path, meta):
     amroot = os.geteuid() == 0
@@ -199,8 +223,10 @@ def SetPosix(path, meta):
             if e.errno != errno.EPERM and amroot:
                 raise e
 
+
 def EntryInDictionary(name, mDict, prefix):
-    if (name in mDict):  return True
+    if (name in mDict):
+        return True
     if prefix is not None:
         if (prefix + name in mDict):
             return True
@@ -217,14 +243,15 @@ TAR_FLAGS_KEY = "flags"
 # This will be file, dir, slink, link; anything else will throw an exception
 TAR_TYPE_KEY = "type"
 
+
 def GetTarMeta(ti):
     global debug, verbose
     ext_keys = {
-        "nodump" : stat.UF_NODUMP,
-        "sappnd" : stat.SF_APPEND,
-        "schg" : stat.SF_IMMUTABLE,
-        "sunlnk" : stat.SF_NOUNLINK,
-        "uchg" : stat.UF_IMMUTABLE,
+        "nodump": stat.UF_NODUMP,
+        "sappnd": stat.SF_APPEND,
+        "schg": stat.SF_IMMUTABLE,
+        "sunlnk": stat.SF_NOUNLINK,
+        "uchg": stat.UF_IMMUTABLE,
         }
     rv = {}
     rv[TAR_UID_KEY] = ti.uid
@@ -248,22 +275,25 @@ def GetTarMeta(ti):
         flags = 0
         if "SCHILY.fflags" in ti.pax_headers:
             for k in ti.pax_headers["SCHILY.fflags"].split(","):
-                if debug > 1: log.debug("flag %s" % k)
+                if debug > 1:
+                    log.debug("flag %s" % k)
                 if k in ext_keys:
                     flags |= ext_keys[k]
-            if debug > 1: log.debug("flags was %s, value = %o" % (ti.pax_headers["SCHILY.fflags"], flags))
+            if debug > 1:
+                log.debug("flags was %s, value = %o" % (ti.pax_headers["SCHILY.fflags"], flags))
         rv[TAR_FLAGS_KEY] = flags
     return rv
 
 
-def RunPkgScript(scripts, type, root = None, **kwargs):
+def RunPkgScript(scripts, type, root=None, **kwargs):
     # This makes my head hurt
     if scripts is None:
         return
     if type not in scripts:
-        if verbose or debug:  log.debug("No %s script to run" % type)
+        if verbose or debug:
+            log.debug("No %s script to run" % type)
         return
-    
+
     scriptName = "/%d-%s" % (os.getpid(), type)
     if root and root != "":
         scriptPath = "%s%s" % (root, scriptName)
@@ -271,17 +301,19 @@ def RunPkgScript(scripts, type, root = None, **kwargs):
         # Writing to root isn't ideal, so this should be re-examined
         scriptName = "/tmp" + scriptName
         scriptPath = scriptName
-        
+
     with open(scriptPath, "w") as f:
         f.write(scripts[type])
     args = ["sh", "-x", scriptName]
     if "SCRIPT_ARG" in kwargs and kwargs["SCRIPT_ARG"] is not None:
         args.append(kwargs["SCRIPT_ARG"])
-        
+
     print("script (chroot to %s):  %s\n-----------" % ("/" if root is None else root, args))
     print("%s\n--------------" % scripts[type])
     if os.geteuid() != 0 and root is not None:
-        log.error("Installation root is set, and process is not root.  Cannot run script %s" % type)
+        log.error(
+            "Installation root is set, and process is not root.  Cannot run script %s" % type
+        )
         if debug < 4:
             return
     else:
@@ -306,14 +338,15 @@ def RunPkgScript(scripts, type, root = None, **kwargs):
             log.error("Huh?  Got -1 from os.fork and no exception?")
 
     os.unlink(scriptPath)
-        
+
     return
 
 # This function does the bulk of the work for installation.
 # It is given a tarfile object, an entry object into it, a
 # root directory, and an optional prefix and hash.
 
-def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
+
+def ExtractEntry(tf, entry, root, prefix=None, mFileHash=None):
     # This bit of code tries to turn the
     # mixture of root, prefix, and pathname into something
     # we can both manipulate, and something we can put into
@@ -346,7 +379,6 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
         full_path = "%s%s" % ("" if fileName.startswith("/") else "/", fileName)
         root = ""
     try:
-        import stat
         m = os.lstat(full_path).st_mode
         if stat.S_ISDIR(m):
             orig_type = TYPE_DIR
@@ -363,14 +395,16 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
     # and the name of the file.
     dirname = os.path.dirname(full_path)
     # Debugging stuff
-    if debug > 0 or verbose: log.debug("%s:  will be extracted as %s" % (entry.name, full_path))
-    if debug > 2: log.debug("entry = %s" % (entry))
-        
+    if debug > 0 or verbose:
+        log.debug("%s:  will be extracted as %s" % (entry.name, full_path))
+    if debug > 2:
+        log.debug("entry = %s" % (entry))
+
     # Get the metainformation from the TarInfo entry.  This is complicated
     # because of how flags are done.  Note that we don't bother with time
     # information.
     meta = GetTarMeta(entry)
-    
+
     # Make sure the directory we're creating in exists.
     # We don't bother with ownership/mode of the intermediate paths,
     # because either it will exist already, or will be part of the
@@ -380,7 +414,7 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
         MakeDirs(dirname)
     type = None
     hash = ""
-    
+
     if entry.isfile() or entry.islnk():
         new_type = TYPE_FILE
     elif entry.isdir():
@@ -394,7 +428,9 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
     # then bad things could happen.  Especially if it changed from
     # a symlink to a file or directory.
     if orig_type is not None and orig_type != new_type:
-        log.debug("Original type = %s, new type = %s, path = %s" % (orig_type, new_type, full_path))
+        log.debug(
+            "Original type = %s, new type = %s, path = %s" % (orig_type, new_type, full_path)
+        )
         log.debug("Removing original entry")
         if os.path.islink(full_path) or os.path.isfile(full_path):
             RemoveFile(full_path)
@@ -413,7 +449,7 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
         # Note that we write the file out later, so this allows
         # us to not worry about the buffer.
         try:
-            temp_entry = tempfile.TemporaryFile(dir = os.path.dirname(full_path))
+            temp_entry = tempfile.TemporaryFile(dir=os.path.dirname(full_path))
         except:
             s = "Cannot create temporary file in %s" % os.path.dirname(full_path)
             log.error(s)
@@ -472,7 +508,7 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
         except FileExistsError:
             pass
         SetPosix(full_path, meta)
-        
+
         type = "dir"
         hash = ""
     elif entry.issym():
@@ -548,15 +584,16 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
                     raise e
             if st.st_flags != 0:
                 os.lchflags(source_file, st.st_flags)
-        
+
         except OSError as e:
             log.error("Could not link %s to %s: %s" % (source_file, full_path, str(e)))
             sys.exit(1)
         # Except on mac os, hard links are always files.
         type = "file"
-        # Cheating a bit:  we'll use the same hash for the hard-link file that's in the pkgng manifest.
+        # Cheating a bit: we'll use the same hash for the hard-link
+        # file that's in the pkgng manifest.
         hash = mFileHash
-            
+
     if type is not None:
         return (fileName,
                 type,
@@ -568,6 +605,7 @@ def ExtractEntry(tf, entry, root, prefix = None, mFileHash = None):
     else:
         return None
 
+
 def install_path(pkgfile, dest):
     try:
         f = open(pkgfile, "r")
@@ -576,7 +614,8 @@ def install_path(pkgfile, dest):
         return False
     else:
         return install_file(f, dest)
-            
+
+
 def install_file(pkgfile, dest):
     from . import Configuration
     global debug, verbose, dryrun
@@ -587,7 +626,7 @@ def install_file(pkgfile, dest):
     upgrade_aware = False
 
     try:
-        t = tarfile.open(fileobj = pkgfile)
+        t = tarfile.open(fileobj=pkgfile)
     except Exception as err:
         log.error("Could not open package file %s: %s" % (pkgfile.name, str(err)))
         return False
@@ -597,7 +636,8 @@ def install_file(pkgfile, dest):
     # Skip past entries with '#', except for
     # the manifest file
     for member in t:
-        if not member.name.startswith("+"): break
+        if not member.name.startswith("+"):
+            break
         if member.name == PKG_MANIFEST_NAME:
             manifest = t.extractfile(member)
             mjson = json.loads(manifest.read().decode('utf8'))
@@ -608,7 +648,7 @@ def install_file(pkgfile, dest):
     if mjson is None:
         log.error("Could not find manifest in package file %s" % pkgfile.name)
         return False
-    
+
     # Check the architecture
     if PKG_ARCH_KEY in mjson:
         if not (mjson[PKG_ARCH_KEY] in pkg_valid_archs):
@@ -617,8 +657,9 @@ def install_file(pkgfile, dest):
 
     if PKG_PREFIX_KEY in mjson:
         prefix = mjson[PKG_PREFIX_KEY]
-        if verbose or debug: log.debug("prefix = %s" % prefix)
-    
+        if verbose or debug:
+            log.debug("prefix = %s" % prefix)
+
     # See above for how scripts are handled.  It's a mess.
     if PKG_SCRIPTS_KEY in mjson:
         pkgScripts = mjson[PKG_SCRIPTS_KEY]
@@ -626,7 +667,7 @@ def install_file(pkgfile, dest):
         pkgScripts = {}
 
     # At this point, the tar file is at the first non-+-named files.
-    
+
     pkgName = mjson[PKG_NAME_KEY]
     pkgVersion = mjson[PKG_VERSION_KEY]
     pkgDeletedFiles = []
@@ -641,23 +682,27 @@ def install_file(pkgfile, dest):
 
         pkgDeltaVersion = pkgDeltaDict[PKG_DELTA_VERSION_KEY]
 
-        if PKG_REMOVED_FILES_KEY in mjson: pkgDeletedFiles = mjson[PKG_REMOVED_FILES_KEY]
-        if PKG_REMOVED_DIRS_KEY in mjson: pkgDeletedDirs = mjson[PKG_REMOVED_DIRS_KEY]
-        if verbose or debug:  log.debug("Deleted files = %s, deleted dirs = %s" % (pkgDeletedFiles, pkgDeletedDirs))
-        
+        if PKG_REMOVED_FILES_KEY in mjson:
+            pkgDeletedFiles = mjson[PKG_REMOVED_FILES_KEY]
+        if PKG_REMOVED_DIRS_KEY in mjson:
+            pkgDeletedDirs = mjson[PKG_REMOVED_DIRS_KEY]
+        if verbose or debug:
+            log.debug("Deleted files = %s, deleted dirs = %s" % (pkgDeletedFiles, pkgDeletedDirs))
+
     else:
         pkgDeltaVersion = None
-            
+
     mfiles = mjson[PKG_FILES_KEY]
     mdirs = {}
     if PKG_DIRECTORIES_KEY in mjson:
         mdirs.update(mjson[PKG_DIRECTORIES_KEY])
     if PKG_DIRS_KEY in mjson:
         mdirs.update(mjson[PKG_DIRS_KEY])
-    
+
     print("%s-%s" % (pkgName, pkgVersion))
-    if debug > 1:  log.debug("installation target = %s" % dest)
-        
+    if debug > 1:
+        log.debug("installation target = %s" % dest)
+
     # Note that none of this is at all atomic.
     # To fix that, I should go to a persistent sqlite connection,
     # and use a transaction.
@@ -682,9 +727,16 @@ def install_file(pkgfile, dest):
         # First thing we do, if we're upgrade-aware, is to run the
         # upgrade scripts from the old version.
         if upgrade_aware:
-            RunPkgScript(old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE, dest, PKG_PREFIX=prefix)
-            RunPkgScript(old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE, dest, PKG_PREFIX=prefix,
-                         SCRIPT_ARG="PRE-UPGRADE")
+            RunPkgScript(
+                old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE, dest, PKG_PREFIX=prefix
+            )
+            RunPkgScript(
+                old_scripts,
+                PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE,
+                dest,
+                PKG_PREFIX=prefix,
+                SCRIPT_ARG="PRE-UPGRADE"
+            )
 
         # If the new version is a delta package, we do things differently
         if pkgDeltaVersion is not None:
@@ -694,8 +746,10 @@ def install_file(pkgfile, dest):
                 return False
             # Run a pre-delta script if any, but only if dest is none
             if dest is None:
-                RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA, dest, PKG_PREFIX=prefix)
-            
+                RunPkgScript(
+                    pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA, dest, PKG_PREFIX=prefix
+                )
+
             # Next step for a delta package is to remove any removed files and directories.
             # This is done in both the database and the filesystem.
             # If we can't remove a directory due to ENOTEMPTY, we don't care.
@@ -705,12 +759,14 @@ def install_file(pkgfile, dest):
                 else:
                     full_path = "/" + file
                 if RemoveFile(full_path) == False:
-                    if debug:  log.debug("Could not remove file %s" % file)
+                    if debug:
+                        log.debug("Could not remove file %s" % file)
                     # Ignor error for now
                 pkgdb.RemoveFileEntry(file)
             # Now we try to delete the directories.
             for dir in pkgDeletedDirs:
-                if verbose or debug:  log.debug("Attempting to remove directory %s" % dir)
+                if verbose or debug:
+                    log.debug("Attempting to remove directory %s" % dir)
                 if dest:
                     full_path = dest + "/" + dir
                 else:
@@ -721,9 +777,19 @@ def install_file(pkgfile, dest):
             # So we don't have to do that now.
         else:
             if not upgrade_aware:
-                RunPkgScript(old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DEINSTALL, dest, PKG_PREFIX=prefix)
-                RunPkgScript(old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_DEINSTALL, dest, PKG_PREFIX=prefix,
-                             SCRIPT_ARG="DEINSTALL")
+                RunPkgScript(
+                    old_scripts,
+                    PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DEINSTALL,
+                    dest,
+                    PKG_PREFIX=prefix
+                )
+                RunPkgScript(
+                    old_scripts,
+                    PKG_SCRIPT_TYPES.PKG_SCRIPT_DEINSTALL,
+                    dest,
+                    PKG_PREFIX=prefix,
+                    SCRIPT_ARG="DEINSTALL"
+                )
 
             if pkgdb.RemovePackageFiles(pkgName) == False:
                 log.error("Could not remove files from package %s" % pkgName)
@@ -741,10 +807,19 @@ def install_file(pkgfile, dest):
                 return False
 
             if not upgrade_aware:
-                RunPkgScript(old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DEINSTALL, dest, PKG_PREFIX=prefix)
-                RunPkgScript(old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL, dest, PKG_PREFIX=prefix,
-                             SCRIPT_ARG="POST-DEINSTALL")
-
+                RunPkgScript(
+                    old_scripts,
+                    PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DEINSTALL,
+                    dest,
+                    PKG_PREFIX=prefix
+                )
+                RunPkgScript(
+                    old_scripts,
+                    PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL,
+                    dest,
+                    PKG_PREFIX=prefix,
+                    SCRIPT_ARG="POST-DEINSTALL"
+                )
 
     if pkgDeltaVersion is not None:
         if pkgdb.UpdatePackage(pkgName, pkgDeltaVersion, pkgVersion, pkgScripts) == False:
@@ -756,12 +831,12 @@ def install_file(pkgfile, dest):
         return False
 
     # Is this correct behaviour for delta packages?
-    if upgrade_aware == False:
+    if upgrade_aware is False:
         RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_INSTALL,
                      dest, PKG_PREFIX=prefix)
         RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL,
                      dest, PKG_PREFIX=prefix, SCRIPT_ARG="PRE-INSTALL")
-            
+
     # Go through the tarfile, looking for entries in the manifest list.
     pkgFiles = []
     while member is not None:
@@ -790,25 +865,44 @@ def install_file(pkgfile, dest):
                 member = t.next()
                 continue
         if pkgDeltaVersion is not None:
-            if verbose or debug: log.debug("Extracting %s from delta package" % member.name)
+            if verbose or debug:
+                log.debug("Extracting %s from delta package" % member.name)
         list = ExtractEntry(t, member, dest, prefix, mFileHash)
         if list is not None:
             pkgFiles.append((pkgName,) + list)
-    
+
         member = t.next()
-    
+
     if len(pkgFiles) > 0:
         pkgdb.AddFilesBulk(pkgFiles)
-        
+
     if upgrade_aware:
         RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE, dest, PKG_PREFIX=prefix)
-        RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE, dest, PKG_PREFIX=prefix, SCRIPT_ARG="POST-UPGRADE")
+        RunPkgScript(
+            pkgScripts,
+            PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE,
+            dest,
+            PKG_PREFIX=prefix,
+            SCRIPT_ARG="POST-UPGRADE"
+        )
         if dest is None and pkgDeltaVersion is not None:
-            RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA, dest, PKG_PREFIX=prefix)
+            RunPkgScript(
+                pkgScripts,
+                PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA,
+                dest,
+                PKG_PREFIX=prefix
+            )
     else:
         RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_INSTALL, dest, PKG_PREFIX=prefix)
-        RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL, dest, PKG_PREFIX=prefix, SCRIPT_ARG="POST-INSTALL")
+        RunPkgScript(
+            pkgScripts,
+            PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL,
+            dest,
+            PKG_PREFIX=prefix,
+            SCRIPT_ARG="POST-INSTALL"
+        )
     return True
+
 
 class Installer(object):
     _root = None
@@ -816,10 +910,11 @@ class Installer(object):
     _manifest = None
     _packages = []
 
-    def __init__(self, config = None, manifest = None, root = None):
+    def __init__(self, config=None, manifest=None, root=None):
         self._conf = config
         self._manifest = manifest
-        if root is not None: self._root = root
+        if root is not None:
+            self._root = root
 
         if self._conf is None:
             # Get the system configuration
@@ -856,7 +951,7 @@ class Installer(object):
             pkgFile = self._conf.FindPackageFile(pkg, handler=get_file_handler)
             if pkgFile is None:
                 raise InstallerPackageNotFoundException("%s-%s" % (pkg.Name(), pkg.Version()))
-            self._packages.append({ pkg.Name() : pkgFile})
+            self._packages.append({pkg.Name(): pkgFile})
         # At this point, self._packages has all of the packages we want to install,
         # ready for installation
         return True
@@ -871,6 +966,3 @@ class Installer(object):
                     log.error("Unable to install package %s" % pkgname)
                     return False
         return True
-
-
-
