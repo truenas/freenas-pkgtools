@@ -144,6 +144,7 @@ def StartServices(svc_list):
 
 # Used by the clone functions below
 beadm = "/usr/local/sbin/beadm"
+dsinit = "/usr/local/sbin/dsinit"
 grub_dir = "/boot/grub"
 grub_cfg = "/boot/grub/grub.cfg"
 freenas_pool = "freenas-boot"
@@ -443,9 +444,16 @@ def CreateClone(name, bename=None, rename=None):
         log.debug("CreateClone with rename, temp_name = %s" % temp_name)
     else:
         args.append(name)
+
+    if not RunCommand(dsinit, ["--lock"]):
+        return False
+
     rv = RunCommand(beadm, args)
     if rv is False:
         return False
+
+    if not RunCommand(dsinit, ["--unlock"]):
+        return False    
 
     if rename:
         # We've created Pre-<newname>-<random>
