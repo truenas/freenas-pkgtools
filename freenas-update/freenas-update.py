@@ -135,7 +135,25 @@ def main():
         else:
             download_dir = cache_dir
 
-        rv = Update.DownloadUpdate(train, download_dir, pkg_type = pkg_type)
+        try:
+            rv = Update.DownloadUpdate(train, download_dir, pkg_type = pkg_type)
+        except Exceptions.ManifestInvalidSignature:
+            log.error("Manifest has invalid signature")
+            print("Manifest has invalid signature", file=sys.stderr)
+            sys.exit(1)
+        except Exceptions.UpdateBusyCacheException as e:
+            log.error(str(e))
+            print("Download cache directory is busy", file=sys.stderr)
+            sys.exit(1)
+        except Exceptions.UpdateIncompleteCacheException:
+            log.error(str(e))
+            print("Incomplete download cache, cannot update", file=sys.stderr)
+            sys.exit(1)
+        except BaseException as e:
+            log.error(str(e))
+            print("Received exception during download phase, cannot update", file=sys.stderr)
+            sys.exit(1)
+
         if rv is False:
             if verbose:
                 print("No updates available")

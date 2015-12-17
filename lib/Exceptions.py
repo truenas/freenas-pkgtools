@@ -30,6 +30,9 @@ class UpdateBusyCacheException(UpdateException):
     pass
 
 
+class UpdatePackageNotFound(UpdateException):
+    pass
+
 class UpdateManifestNotFound(UpdateException):
     pass
 

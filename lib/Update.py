@@ -775,6 +775,8 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
     allow it to determine if a reboot into a different boot environment
     has happened.  This will remove the existing content if it decides
     it has to redownload for any reason.
+    Returns True if an update is available, False if no update is avialbale.
+    Raises exceptions on errors.
     """
     import fcntl
 
@@ -785,7 +787,7 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
         latest_mani = conf.FindLatestManifest(train, require_signature=True)
     except ManifestInvalidSignature as e:
         log.error("Latest manifest has invalid signature: %s" % str(e))
-        return False
+        raise e
 
     if latest_mani is None:
         # This probably means we have no network.  Which means we have
@@ -797,10 +799,10 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             return True
         except UpdateIncompleteCacheException:
             log.debug("Possibly with no network, cached update is incomplete")
-            return False
+            raise
         except:
             log.debug("Possibly with no network, either no cached update or it is bad")
-            return False
+            raise
 
     cache_mani = Manifest.Manifest(require_signature=True)
     try:
@@ -816,8 +818,9 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             mani_file.close()
         mani_file = None
     except UpdateBusyCacheException:
-        log.debug("Cache directory %s is busy, so no update available" % directory)
-        return False
+        msg = "Cache directory %s is busy, so no update available" % directory
+        log.debug(msg)
+        raise UpdateBusyCacheException(msg)
     except UpdateIncompleteCacheException:
         log.debug("Incomplete cache directory, will try continuing")
         # Hm, this is wrong.  I need to load the manifest file someh
@@ -838,9 +841,10 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
         try:
             fcntl.lockf(mani_file, fcntl.LOCK_EX | fcntl.LOCK_NB, 0, 0)
         except (IOError, Exception) as e:
-            log.debug("Unable to lock manifest file: %s" % str(e))
+            msg = "Unable to lock manifest file: %s" % str(e)
+            log.debug(msg)
             mani_file.close()
-            return False
+            raise Exceptions.UpdateBusyCacheException(msg)
 
         temporary_manifest = Manifest.Manifest(require_signature=True)
         log.debug("Going to try loading manifest file now")
@@ -852,6 +856,7 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             RemoveUpdate(directory)
             mani_file = None
     except BaseException as e:
+        # This could just be that the file doesn't exist, so we don't pass on the exception
         mani_file = None
         log.debug("Got this exception: %s" % str(e))
 
@@ -866,14 +871,15 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             mani_file = open(directory + "/MANIFEST", "w+b")
         except (IOError, Exception) as e:
             log.error("Unale to create manifest file in directory %s" % (directory, str(e)))
-            return False
+            raise e
 
         try:
             fcntl.lockf(mani_file, fcntl.LOCK_EX | fcntl.LOCK_NB, 0, 0)
         except (IOError, Exception) as e:
-            log.debug("Unable to lock manifest file: %s" % str(e))
+            msg = "Unable to lock manifest file: %s" % str(e)
+            log.debug(msg)
             mani_file.close()
-            return False
+            raise Exceptions.UpdateBusyCacheException(msg)
         # Store the latest manifest.
         latest_mani.StoreFile(mani_file)
         mani_file.flush()
@@ -908,14 +914,15 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
         # To do that, we may need to know which update was downloaded.
         if check_handler:
             check_handler(indx + 1,  pkg=pkg, pkgList=download_packages)
-        pkg_file = conf.FindPackageFile(
-            pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type
-        )
-        if pkg_file is None:
-            log.error("Could not download package file for %s" % pkg.Name())
+        try:
+            pkg_file = conf.FindPackageFile(
+                pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type
+            )
+        except BaseException as e:
+            log.error("Could not download package file for %s: %s" % (pkg.Name(), str(e)))
             RemoveUpdate(directory)
             mani_file.close()
-            return False
+            raise e
 
     # Almost done:  get a changelog if one exists for the train
     # If we can't get it, we don't care.
@@ -968,6 +975,7 @@ def PendingUpdatesChanges(directory):
         raise
     except UpdateIncompleteCacheException as e:
         log.error(str(e))
+        raise
     except UpdateInvalidCacheException as e:
         log.error(str(e))
         RemoveUpdate(directory)

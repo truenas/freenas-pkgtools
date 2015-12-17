@@ -1104,6 +1104,7 @@ class Configuration(object):
         # If we find it, and the checksum matches, we're good to go.
         # If not, we have to grab it off the network and use that.  We can't
         # check that checksum until we get it.
+        pkg_exception = None
         for search_attempt in package_files:
             # First try the local copy.
             log.debug("Searching for %s" % search_attempt["Filename"])
@@ -1117,6 +1118,8 @@ class Configuration(object):
                             h = ChecksumFile(file)
                             if h == search_attempt["Checksum"]:
                                 return file
+                            else:
+                                pkg_exception = Exceptions.ChecksumFailException("%{0} has invalid checksum".format(search_attempt["Filename"]))
                         else:
                             # No checksum for the file, so we'll just go with it.
                             return file
@@ -1148,11 +1151,15 @@ class Configuration(object):
                         log.debug("Checksum doesn't match, removing file")
                         if save_name:
                             os.unlink(save_name)
+                        pkg_exception = Exceptions.ChecksumFailException("%{0} has invalid checksum".format(pFile))
                 else:
                     # No checksum for the file, so we just go with it
                     return file
 
-        return None
+        if pkg_exception:
+            raise pkg_exception
+        raise Exceptions.UpdatePackageNotFound(package.Name())
+
 
 
 def is_ignore_path(path):
