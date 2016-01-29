@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import random
+import libzfs
 
 from . import Avatar
 import freenasOS.Manifest as Manifest
@@ -218,6 +219,7 @@ def CloneSetAttr(clone, **kwargs):
     Currently only 'keep' (which maps to beadm:keep)
     is allowed.
     """
+    zfs = libzfs.ZFS()
     if clone is None:
         raise ValueError("Clone must be set")
     if kwargs is None:
@@ -226,9 +228,11 @@ def CloneSetAttr(clone, **kwargs):
     if "keep" in kwargs:
         # This maps to zfs set beadm:keep=%s freenas-boot/ROOT/${bename}
         tval = bool(kwargs["keep"])
-        cmd = ["/sbin/zfs", "set", "beadm:keep=%s" % tval, "freenas-boot/ROOT/%s" % clone["realname"]]
-        # Should I try this and raise a custom exception?
-        subprocess.check_call(cmd)
+        try:
+            ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(clone["realname"]))
+            ds.properties["beadm:keep"].value = str(tval)
+        except:
+            log.debug("Unable to set beadm:keep value on BE {0}".format(clone["realname"]))
         return True
     return False
 
@@ -333,6 +337,7 @@ def ListClones():
     # "beadm list -H"; it then gets a set of properties
     # for each BE.
     # Because of that, it can't use RunCommand
+    zfs = libzfs.ZFS()
     cmd = [beadm, "list", "-H"]
     rv = []
     if debug:
@@ -362,15 +367,14 @@ def ListClones():
             'created': datetime.strptime(fields[4], '%Y-%m-%d %H:%M'),
         }
         try:
-            prop_cmd = ["/sbin/zfs", "get", "-H", "-o", "value", "beadm:keep"]
-            prop_cmd.append("freenas-boot/ROOT/{0}".format(tdict["realname"]))
-            keep_str = subprocess.check_output(prop_cmd).decode('utf8').rstrip()
-            if keep_str == "-":
+            ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(tdict["realname"]))
+            kstr = ds.properties["beadm:keep"].value
+            if kstr == "-":
                 tdict["keep"] = None
             else:
-                tdict["keep"] = bool(keep_str)
+                tdict["keep"] = bool(kstr)
         except:
-            log.debug("Could not get beadm properties from dataset")
+            tdict["keep"] = None
         rv.append(tdict)
     return rv
 
