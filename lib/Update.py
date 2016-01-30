@@ -6,7 +6,13 @@ import signal
 import subprocess
 import sys
 import random
-import libzfs
+try:
+    import libzfs
+except ImportError:
+    # This might happen during an install of freenas
+    # as py-libzfs is not available as yet, in which
+    # case just pass
+    pass
 
 from . import Avatar
 import freenasOS.Manifest as Manifest
