@@ -924,15 +924,11 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
         # To do that, we may need to know which update was downloaded.
         if check_handler:
             check_handler(indx + 1,  pkg=pkg, pkgList=download_packages)
-        try:
-            pkg_file = conf.FindPackageFile(
-                pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type
-            )
-        except BaseException as e:
-            log.error("Could not download package file for %s: %s" % (pkg.Name(), str(e)))
+        pkg_file = conf.FindPackageFile(pkg, save_dir = directory, handler = get_handler, pkg_type = pkg_type)
+        if pkg_file is None:
+            log.error("Could not download package file for %s" % pkg.Name())
             RemoveUpdate(directory)
-            mani_file.close()
-            raise e
+            return False
 
     # Almost done:  get a changelog if one exists for the train
     # If we can't get it, we don't care.

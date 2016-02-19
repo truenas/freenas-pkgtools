@@ -72,7 +72,8 @@ def main():
     import freenasOS.Configuration as Configuration
     import freenasOS.Manifest as Manifest
     import freenasOS.Update as Update
-
+    import freenasOS.Exceptions as Exceptions
+    
     def usage():
         print("""Usage: %s [-C cache_dir] [-d] [-T train] [--no-delta] [-v] <cmd>, where cmd is one of:
         check\tCheck for updates
