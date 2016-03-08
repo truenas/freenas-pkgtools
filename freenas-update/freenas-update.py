@@ -1,4 +1,5 @@
 #!/usr/local/bin/python3
+from __future__ import print_function
 
 import getopt
 import logging
@@ -96,7 +97,7 @@ def main():
     verbose = False
     debug = 0
     config = None
-    cache_dir = None
+    cache_dir = "/var/db/system/update"
     train = None
     pkg_type = None
     
@@ -128,16 +129,8 @@ def main():
         # we make a temporary directory and use that.  We
         # have to clean up afterwards in that case.
         
-        if cache_dir is None:
-            download_dir = tempfile.mkdtemp(prefix = "UpdateCheck-", dir = config.TemporaryDirectory())
-            if download_dir is None:
-                print("Unable to create temporary directory", file=sys.stderr)
-                sys.exit(1)
-        else:
-            download_dir = cache_dir
-
         try:
-            rv = Update.DownloadUpdate(train, download_dir, pkg_type = pkg_type)
+            rv = Update.DownloadUpdate(train, cache_dir, pkg_type = pkg_type)
         except Exceptions.ManifestInvalidSignature:
             log.error("Manifest has invalid signature")
             print("Manifest has invalid signature", file=sys.stderr)
@@ -158,17 +151,15 @@ def main():
         if rv is False:
             if verbose:
                 print("No updates available")
-            if cache_dir is None:
-                Update.RemoveUpdate(download_dir)
             sys.exit(1)
         else:
-            diffs = Update.PendingUpdatesChanges(download_dir)
+            diffs = Update.PendingUpdatesChanges(cache_dir)
             if diffs is None or len(diffs) == 0:
                 print("Strangely, DownloadUpdate says there updates, but PendingUpdates says otherwise", file=sys.stderr)
                 sys.exit(1)
             PrintDifferences(diffs)
             if cache_dir is None:
-                Update.RemoveUpdate(download_dir)
+                Update.RemoveUpdate(cache_dir)
             sys.exit(0)
 
     elif args[0] == "update":
@@ -192,20 +183,7 @@ def main():
             else:
                 assert False, "Unhandled option %s" % o
         
-        if cache_dir is None:
-            download_dir = tempfile.mkdtemp(prefix = "UpdateUpdate-", dir = config.TemporaryDirectory())
-            if download_dir is None:
-                print("Unable to create temporary directory", file=sys.stderr)
-                sys.exit(1)
-            rv = Update.DownloadUpdate(train, download_dir, pkg_type = pkg_type)
-            if rv is False:
-                if verbose or debug:
-                    print("DownloadUpdate returned False", file=sys.stderr)
-                sys.exit(1)
-        else:
-            download_dir = cache_dir
-        
-        diffs = Update.PendingUpdatesChanges(download_dir)
+        diffs = Update.PendingUpdatesChanges(cache_dir)
         if diffs is None or diffs == {}:
             if verbose:
                 print("No updates to apply", file=sys.stderr)
@@ -213,12 +191,10 @@ def main():
             if verbose:
                 PrintDifferences(diffs)
             try:
-                rv = Update.ApplyUpdate(download_dir, force_reboot = force_reboot)
+                rv = Update.ApplyUpdate(cache_dir, force_reboot = force_reboot)
             except BaseException as e:
                 print("Unable to apply update: %s" % str(e), file=sys.stderr)
                 sys.exit(1)
-            if cache_dir is None:
-                Update.RemoveUpdate(download_dir)    
             if rv:
                 print("System should be rebooted now", file=sys.stderr)
             sys.exit(0)
