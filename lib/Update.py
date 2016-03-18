@@ -1217,7 +1217,9 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False):
             args[0] = "destroy"
             RunCommand(cmd, args)
             # And set the beadm:nickname property back
-            args = ["set", "beadm:nickname=%s" % root_env["name"]]
+            args = ["set", "beadm:nickname=%s" % root_env["name"],
+                    "freenas-boot/ROOT/{0}".format(root_env["realname"])]
+
             RunCommand(cmd, args)
 
             raise UpdateBootEnvironmentException(
