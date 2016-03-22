@@ -584,7 +584,7 @@ def UnmountClone(name, mount_point=None):
         rv = RunCommand(cmd, args)
         if rv is False:
             log.error("UNABLE TO MOUNT /boot/grub; SYSTEM MAY NOT BOOT")
-            raise Exception("UNABLE TO REMOUNT /boot/grub; FIX MANUALLY OR SYSTEM AMY NOT BOOT")
+            raise Exception("UNABLE TO REMOUNT /boot/grub; FIX MANUALLY OR SYSTEM MAY NOT BOOT")
         cmd = "/sbin/umount"
         for dir in ["/dev", "/var/tmp"]:
             args = ["-f", mount_point + dir]
