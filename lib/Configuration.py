@@ -1133,13 +1133,19 @@ class Configuration(object):
             if save_dir:
                 save_name = save_dir + "/" + search_attempt["Filename"]
 
-            file = self.TryGetNetworkFile(
-                file=pFile,
-                handler=handler,
-                pathname=save_name,
-                reason="DownloadPackageFile",
-                intr_ok=True
+            try:
+                file = None
+                file = self.TryGetNetworkFile(
+                    file=pFile,
+                    handler=handler,
+                    pathname=save_name,
+                    reason="DownloadPackageFile",
+                    intr_ok=True
                 )
+            except BaseException as e:
+                log.debug("Trying to get %s, got exception %s, continuing" % (pFile, str(e)))
+                continue
+            
             if file:
                 if search_attempt["Checksum"]:
                     h = ChecksumFile(file)
