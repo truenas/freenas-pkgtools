@@ -720,6 +720,7 @@ def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None)
 
     conf = Configuration.Configuration()
     new_manifest = None
+    mfile = None
     if cache_dir:
         try:
             mfile = VerifyUpdate(cache_dir)
@@ -737,13 +738,15 @@ def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None)
         except BaseException as e:
             log.error("CheckForUpdate(train=%s, cache_dir = %s):  Got exception %s" % (train, cache_dir, str(e)))
             raise e
-        # We always want a valid signature when doing an update
-        new_manifest = Manifest.Manifest(require_signature=True)
-        try:
-            new_manifest.LoadFile(mfile)
-        except Exception as e:
-            log.error("Could not load manifest due to %s" % str(e))
-            raise e
+        if mfile:
+            # We always want a valid signature when doing an update
+            new_manifest = Manifest.Manifest(require_signature=True)
+            try:
+                new_manifest.LoadFile(mfile)
+                mfile.close()
+            except Exception as e:
+                log.error("Could not load manifest due to %s" % str(e))
+                raise e
     else:
         try:
             new_manifest = conf.FindLatestManifest(train=train, require_signature=True)
@@ -761,6 +764,9 @@ def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None)
             )
         )
         return None
+
+    # See if the validation script is happy
+    new_manifest.RunValidationProgram(cache_dir)
 
     diffs = GetUpdateChanges(conf.SystemManifest(), new_manifest)
     if diffs is None or len(diffs) == 0:
@@ -815,6 +821,7 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             raise
 
     cache_mani = Manifest.Manifest(require_signature=True)
+    mani_file = None
     try:
         mani_file = VerifyUpdate(directory)
         if mani_file:
@@ -833,7 +840,7 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
         raise UpdateBusyCacheException(msg)
     except UpdateIncompleteCacheException:
         log.debug("Incomplete cache directory, will try continuing")
-        # Hm, this is wrong.  I need to load the manifest file someh
+        # Hm, this is wrong.  I need to load the manifest file somehow
     except (UpdateInvalidCacheException, ManifestInvalidSignature) as e:
         # It's incomplete, so we need to remove it
         log.error("DownloadUpdate(%s, %s):  Got exception %s; removing cache" % (train, directory, str(e)))
@@ -894,6 +901,10 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
         latest_mani.StoreFile(mani_file)
         mani_file.flush()
 
+    # Run the update validation, if any.
+    # Note that this downloads the file if it's not already there.
+    latest_mani.RunValidationProgram(directory, kind=Manifest.VALIDATE_UPDATE)
+    
     # Find out what differences there are
     diffs = Manifest.DiffManifests(mani, latest_mani)
     if diffs is None or len(diffs) == 0:
@@ -1399,6 +1410,13 @@ def VerifyUpdate(directory):
         log.error("Cached server, %s, does not match system update server, %s" % (cached_server, conf.UpdateServerName()))
         raise UpdateInvalidCacheException("Cached server name does not match system update server")
 
+    # Next, see if the validation script (if any) is there
+    validation_program = cached_mani.ValidationProgram(Manifest.VALIDATE_UPDATE)
+    if validation_program:
+        if not os.path.exists(os.path.join(directory, validation_program["Kind"])):
+            log.error("Validation program %s is required, but not in cache directory" % validation_program["Kind"])
+            raise UpdateIncompleteCacheException("Cache directory %s missing validation program %s" % (directory, validation_program["Kind"]))
+    
     # Next thing to do is go through the manifest, and decide which package files we need.
     diffs = Manifest.DiffManifests(mani, cached_mani)
     # This gives us an array to examine.
