@@ -371,18 +371,22 @@ def ListClones():
             'mountpoint': fields[2],
             'space': fields[3],
             'created': datetime.strptime(fields[4], '%Y-%m-%d %H:%M'),
+            'keep': None,
+            'rawspace': None
         }
         try:
             ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(tdict["realname"]))
-            kstr = ds.properties["beadm:keep"].value
-            if kstr == "True":
-                tdict["keep"] = True
-            elif kstr == "False":
-                tdict["keep"] = False
-            else:
-                tdict["keep"] = None
-        except:
-            tdict["keep"] = None
+            tdict["rawspace"] = ds.properties["used"].rawvalue
+            try:
+                kstr = ds.properties["beadm:keep"].value
+                if kstr == "True":
+                    tdict["keep"] = True
+                elif kstr == "False":
+                    tdict["keep"] = False
+            except KeyError:
+                pass
+        except libzfs.ZFSException:
+            pass
         rv.append(tdict)
     return rv
 
