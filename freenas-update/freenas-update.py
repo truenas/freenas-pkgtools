@@ -411,11 +411,10 @@ where cmd is one of:
 
         try:
             DoUpdate(cache_dir, verbose)
-            sys.exit(0)
-        except SystemExit as e:
-            sys.exit(e.code)
         except:
             sys.exit(1)
+        else:
+            sys.exit(0)
     else:
         # If it's not a tarfile (possibly because it doesn't exist),
         # print usage and exit.
@@ -453,11 +452,10 @@ where cmd is one of:
 
         try:
             DoUpdate(cache_dir, verbose)
-            sys.exit(0)
-        except SystemExit as e:
-            sys.exit(e.code)
         except:
             sys.exit(1)
-
+        else:
+            sys.exit(0)
+            
 if __name__ == "__main__":
     sys.exit(main())
