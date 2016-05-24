@@ -412,6 +412,8 @@ where cmd is one of:
         try:
             DoUpdate(cache_dir, verbose)
             sys.exit(0)
+        except SystemExit as e:
+            sys.exit(e.code)
         except:
             sys.exit(1)
     else:
@@ -452,6 +454,8 @@ where cmd is one of:
         try:
             DoUpdate(cache_dir, verbose)
             sys.exit(0)
+        except SystemExit as e:
+            sys.exit(e.code)
         except:
             sys.exit(1)
 
