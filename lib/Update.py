@@ -6,6 +6,8 @@ import signal
 import subprocess
 import sys
 import random
+import shutil
+import fcntl
 try:
     import libzfs
 except ImportError:
@@ -469,7 +471,7 @@ def CreateClone(name, bename=None, rename=None):
         return False
 
     if not RunCommand(dsinit, ["--unlock"]):
-        return False    
+        return False
 
     if rename:
         # We've created Pre-<newname>-<random>
@@ -800,7 +802,6 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
     Returns True if an update is available, False if no update is avialbale.
     Raises exceptions on errors.
     """
-    import fcntl
 
     conf = Configuration.Configuration()
     mani = conf.SystemManifest()
@@ -867,7 +868,7 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             msg = "Unable to lock manifest file: %s" % str(e)
             log.debug(msg)
             mani_file.close()
-            raise Exceptions.UpdateBusyCacheException(msg)
+            raise UpdateBusyCacheException(msg)
 
         temporary_manifest = Manifest.Manifest(require_signature=True)
         log.debug("Going to try loading manifest file now")
@@ -902,7 +903,7 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             msg = "Unable to lock manifest file: %s" % str(e)
             log.debug(msg)
             mani_file.close()
-            raise Exceptions.UpdateBusyCacheException(msg)
+            raise UpdateBusyCacheException(msg)
         # Store the latest manifest.
         latest_mani.StoreFile(mani_file)
         mani_file.flush()
@@ -910,7 +911,7 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
     # Run the update validation, if any.
     # Note that this downloads the file if it's not already there.
     latest_mani.RunValidationProgram(directory, kind=Manifest.VALIDATE_UPDATE)
-    
+
     # Find out what differences there are
     diffs = Manifest.DiffManifests(mani, latest_mani)
     if diffs is None or len(diffs) == 0:
@@ -940,8 +941,8 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
         # This is where we find out for real if a reboot is required.
         # To do that, we may need to know which update was downloaded.
         if check_handler:
-            check_handler(indx + 1,  pkg=pkg, pkgList=download_packages)
-        pkg_file = conf.FindPackageFile(pkg, save_dir = directory, handler = get_handler, pkg_type = pkg_type)
+            check_handler(indx + 1, pkg=pkg, pkgList=download_packages)
+        pkg_file = conf.FindPackageFile(pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type)
         if pkg_file is None:
             log.error("Could not download package file for %s" % pkg.Name())
             RemoveUpdate(directory)
@@ -1334,7 +1335,7 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False):
                     rv = RunCommand(cmd, args)
                     if rv is False:
                         log.error("Unable to set nickname, wonder what I did wrong")
-                    args = ["destroy", "-r", snapshot_name ]
+                    args = ["destroy", "-r", snapshot_name]
                     rv = RunCommand(cmd, args)
                     if rv is False:
                         log.error("Unable to destroy snapshot %s" % snapshot_name)
@@ -1422,7 +1423,7 @@ def VerifyUpdate(directory):
         if not os.path.exists(os.path.join(directory, validation_program["Kind"])):
             log.error("Validation program %s is required, but not in cache directory" % validation_program["Kind"])
             raise UpdateIncompleteCacheException("Cache directory %s missing validation program %s" % (directory, validation_program["Kind"]))
-    
+
     # Next thing to do is go through the manifest, and decide which package files we need.
     diffs = Manifest.DiffManifests(mani, cached_mani)
     # This gives us an array to examine.
@@ -1440,11 +1441,11 @@ def VerifyUpdate(directory):
                 cur_vers = old.Version()
             # This is slightly redundant -- if cur_vers is None, it'll check
             # the same filename twice.
-            if not os.path.exists(directory + "/" + pkg.FileName())  and \
+            if not os.path.exists(directory + "/" + pkg.FileName()) and \
                not os.path.exists(directory + "/" + pkg.FileName(cur_vers)):
                 # Neither exists, so incoplete
                 log.error(
-                    "Cache %s  directory missing files for package %s" % (directory, pkg.Name())
+                    "Cache %s directory missing files for package %s" % (directory, pkg.Name())
                 )
                 raise UpdateIncompleteCacheException(
                     "Cache directory {0} missing files for package {1}".format(directory, pkg.Name())
@@ -1493,7 +1494,6 @@ def VerifyUpdate(directory):
 
 
 def RemoveUpdate(directory):
-    import shutil
     try:
         shutil.rmtree(directory)
     except:
