@@ -1,3 +1,4 @@
+from __future__ import print_function
 from datetime import datetime
 import ctypes
 import logging
@@ -425,7 +426,7 @@ zfs inherit -r beadm:nickname freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
     zfs rollback freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
     zfs set beadm:nickname=${CURRENT} freenas-boot/ROOT/${CURRENT}
 # Success
-    beadm activate ${NEW}	# Not sure that's necessary or will work
+    /beadm activate ${NEW}	# Not sure that's necessary or will work
 
 # Either case
 zfs destroy -r freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
@@ -1356,7 +1357,6 @@ def VerifyUpdate(directory):
     UpdateIncompleteCacheException or UpdateInvalidCacheException --
     if necessary.
     """
-    import fcntl
 
     # First thing we do is get the systen configuration and
     # systen manifest
