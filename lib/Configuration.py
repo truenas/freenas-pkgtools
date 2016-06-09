@@ -103,7 +103,11 @@ class CertValidatingHTTPSConnection(http.client.HTTPConnection):
 
     def __init__(self, host, port=None, key_file=None, cert_file=None,
                              ca_certs=None, strict=None, **kwargs):
-        http.client.HTTPConnection.__init__(self, host, port, strict, **kwargs)
+        if sys.version_info[0] > 2:
+            # python3's HTTPConnection dropped the strict argument.
+            http.client.HTTPConnection.__init__(self, host=host, port=port, **kwargs)
+        else:
+            http.client.HTTPConnection.__init__(self, host=host, port=port, strict=strict, **kwargs)
         self.key_file = key_file
         self.cert_file = cert_file
         self.ca_certs = ca_certs

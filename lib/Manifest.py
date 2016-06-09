@@ -58,6 +58,25 @@ VALIDATE_INSTALL_KEY = "InstallCheckProrgam"
 SCHEME_V1 = "version1"
 
 
+def VerificationCertificateFile(manifest):
+    from . import UPDATE_CERT_PRODUCTION, UPDATE_CERT_NIGHTLIES, UPDATE_CERT_DIR
+
+    if manifest is None:
+        raise ValueError("Argument cannot be none")
+
+    train = manifest.Train()
+    if train is None:
+        return UPDATE_CERT_NIGHTLIES
+
+    train_cert = os.path.join(UPDATE_CERT_DIR, train + ".pem")
+    if os.path.exists(train_cert):
+        return train_cert
+
+    if "STABLE" in train:
+        return UPDATE_CERT_PRODUCTION
+
+    return UPDATE_CERT_NIGHTLIES
+
 class ChecksumFailException(Exception):
     pass
 
@@ -380,8 +399,9 @@ class Manifest(object):
         return
 
     def VerifySignature(self):
-        from . import IX_ROOT_CA_FILE, UPDATE_CERT_FILE, VERIFIER_HELPER, IX_CRL
+        from . import IX_ROOT_CA_FILE, VERIFIER_HELPER, IX_CRL
         from . import SIGNATURE_FAILURE
+
         if self.Signature() is None:
             return not SIGNATURE_FAILURE
         # Probably need a way to ignore the signature
@@ -389,8 +409,13 @@ class Manifest(object):
             import subprocess
             import tempfile
 
+            try:
+                cert_file = VerificationCertificateFile(self)
+            except ValueError:
+                cert_file = None
+                
             if not os.path.isfile(IX_ROOT_CA_FILE) or \
-               not os.path.isfile(UPDATE_CERT_FILE) or \
+               not os.path.isfile(cert_file) or \
                not os.path.isfile(VERIFIER_HELPER):
                 log.debug("VerifySignature:  Cannot find a required file")
                 return False
@@ -411,7 +436,7 @@ class Manifest(object):
 
             tdata = None
             verify_cmd = [VERIFIER_HELPER,
-                          "-K", UPDATE_CERT_FILE,
+                          "-K", cert_file,
                           "-C", IX_ROOT_CA_FILE,
                           "-S", self.Signature()]
             if crl_file:
