@@ -1,14 +1,26 @@
-import configparser
+from __future__ import print_function
 import hashlib
 import logging
 import os
 import sys
 import tempfile
 import time
-import urllib.request, urllib.error, urllib.parse
-import http.client
 import socket
 import ssl
+if sys.version_info[0] == 2:
+    import ConfigParser as configparser
+    from urllib2 import Request, urlopen, HTTPError, URLError, HTTPSHandler, AbstractHTTPHandler
+    from urllib2 import build_opener
+    from httplib import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
+    from httplib import HTTPException, HTTPConnection, HTTPS_PORT
+else:
+    import configparser
+    from urllib.request import Request, urlopen, HTTPSHandler, AbstractHTTPHandler
+    from urllib.request import build_opener
+    from urllib.error import HTTPError, URLError
+    import urllib.request, urllib.error, urllib.parse
+    from http.client import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
+    from http.client import HTTPException, HTTPConnection, HTTPS_PORT
 
 from . import Avatar, UPDATE_SERVER, MASTER_UPDATE_SERVER
 from . import Exceptions
@@ -86,9 +98,9 @@ def TryOpenFile(path):
 # http://stackoverflow.com/questions/1087227/validate-ssl-certificates-with-python
 
 
-class InvalidCertificateException(http.client.HTTPException, urllib.error.URLError):
+class InvalidCertificateException(HTTPException, URLError):
     def __init__(self, host, cert, reason):
-        http.client.HTTPException.__init__(self)
+        HTTPException.__init__(self)
         self.host = host
         self.cert = cert
         self.reason = reason
@@ -98,16 +110,16 @@ class InvalidCertificateException(http.client.HTTPException, urllib.error.URLErr
                 (self.host, self.reason, self.cert))
 
 
-class CertValidatingHTTPSConnection(http.client.HTTPConnection):
-    default_port = http.client.HTTPS_PORT
+class CertValidatingHTTPSConnection(HTTPConnection):
+    default_port = HTTPS_PORT
 
     def __init__(self, host, port=None, key_file=None, cert_file=None,
                              ca_certs=None, strict=None, **kwargs):
         if sys.version_info[0] > 2:
             # python3's HTTPConnection dropped the strict argument.
-            http.client.HTTPConnection.__init__(self, host=host, port=port, **kwargs)
+            HTTPConnection.__init__(self, host=host, port=port, **kwargs)
         else:
-            http.client.HTTPConnection.__init__(self, host=host, port=port, strict=strict, **kwargs)
+            HTTPConnection.__init__(self, host=host, port=port, strict=strict, **kwargs)
         self.key_file = key_file
         self.cert_file = cert_file
         self.ca_certs = ca_certs
@@ -147,9 +159,9 @@ class CertValidatingHTTPSConnection(http.client.HTTPConnection):
                 raise InvalidCertificateException(hostname, cert, 'hostname mismatch')
 
 
-class VerifiedHTTPSHandler(urllib.request.HTTPSHandler):
+class VerifiedHTTPSHandler(HTTPSHandler):
     def __init__(self, **kwargs):
-        urllib.request.AbstractHTTPHandler.__init__(self)
+        AbstractHTTPHandler.__init__(self)
         self._connection_args = kwargs
 
     def https_open(self, req):
@@ -160,16 +172,15 @@ class VerifiedHTTPSHandler(urllib.request.HTTPSHandler):
 
         try:
             return self.do_open(http_class_wrapper, req)
-        except urllib.error.URLError as e:
+        except URLError as e:
             if type(e.reason) == ssl.SSLError and e.reason.args[0] == 1:
                 raise InvalidCertificateException(req.host, '', e.reason.args[1])
             raise
 
-    https_request = urllib.request.HTTPSHandler.do_request_
+    https_request = HTTPSHandler.do_request_
 
 
 class PackageDB:
-    # DB_NAME = "var/db/ix/freenas-db"
     DB_NAME = "data/pkgdb/freenas-db"
     __db_path = None
     __db_root = ""
@@ -593,11 +604,11 @@ class Configuration(object):
             host_id = None
 
         license_data = None
-        # try:
-        #     if os.path.exists(LICENSE_FILE):
-        #         license_data = open(LICENSE_FILE, "r").read().rstrip()
-        # except:
-        #     pass
+        try:
+            with open(LICENSE_FILE, "r") as f:
+                license_data = f.read().rstrip()
+        except:
+            pass
 
         read = 0
         retval = None
@@ -622,8 +633,8 @@ class Configuration(object):
             url_exc = None
             try:
                 https_handler = VerifiedHTTPSHandler(ca_certs=DEFAULT_CA_FILE)
-                opener = urllib.request.build_opener(https_handler)
-                req = urllib.request.Request(url)
+                opener = build_opener(https_handler)
+                req = Request(url)
                 req.add_header("X-iXSystems-Project", Avatar())
                 req.add_header("X-iXSystems-Version", current_version)
                 if host_id:
@@ -640,8 +651,8 @@ class Configuration(object):
                     req.add_header("Range", "bytes=%d-" % read)
 
                 furl = opener.open(req, timeout=30)
-            except urllib.error.HTTPError as error:
-                if error.code == http.client.REQUESTED_RANGE_NOT_SATISFIABLE:
+            except HTTPError as error:
+                if error.code == HTTP_RANGE:
                     # We've reached the end of the file already
                     # Can I get this incorrectly from any other server?
                     # Do I need to do something different for the progress handler?

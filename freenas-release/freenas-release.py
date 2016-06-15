@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/env /usr/local/bin/python
+from __future__ import print_function
 import os
 import sys
 import getopt
@@ -74,10 +75,13 @@ def SetConfiguration(path, project, arg_dict = {}):
     If project does not exist as a section in the file, then
     it is created; it may be an empty section.
     """
-    import configparser
-
     # Just a raw config parser so we do no interpolation.
+    if sys.version_info[0] == 2:
+        import ConfigParser as configparser
+    else:
+        import configparser
     cfp = configparser.RawConfigParser()
+
     try:
         fp = open(path, "r")
     except:
@@ -123,7 +127,10 @@ def GetConfiguration(path, project):
     for environment variables and ~expansion.
     This uses the default config file.
     """
-    import configparser
+    if sys.version_info[0] == 2:
+        import ConfigParser as configparser
+    else:
+        import configparser
     # This file is only used in this one function.
     
     retval = None
@@ -3254,7 +3261,11 @@ values.
 
     if del_project:
         # Just do the work here
-        import configparser
+        if sys.version_info[0] == 2:
+            import ConfigParser as configparser
+        else:
+            import configparser
+
         cfp = configparser.RawConfigParser()
         try:
             fp = open(config_file, "r")
@@ -3302,21 +3313,29 @@ def Extract(archive, db, project = "FreeNAS", key = None, args = []):
     """
     This is used to extract a release from the archive.
     That is, for a given sequence, and a target, it will
-    create the target directory, ${PROJECT}-MANIFEST,
-    Packages directory, and various other files necessary
+    create the target directory, MANIFEST, a series of
+    (full) package files, and various other files necessary
     (such as ReleaseNotes, ChangeLog (maybe?), upgrade
     scripts, and RESTART service-restart file.
+    If --tar is given, it will create a tarball.
+    As the last thing it does, it will print the name of the
+    destination.
     """
+    import tempfile
     def Extract_usage():
-        print("Usage:  %s extract [--full] [--dest dest] sequence" % sys.argv[0], file=sys.stderr)
+        print("""
+Usage:  {0} extract [--dest dest] [--tar] sequence
+or	{0} extract [--dest dest] [--tar] --train=TRAIN""".format(sys.argv[0]), file=sys.stderr)
         usage()
         
     sequence = None
     dest = None
-    full = False
-
-    long_options = ["full",
-                    "dest=",
+    train = None
+    tarball = False
+    
+    long_options = ["dest=",
+                    "train=",
+                    "tar",
                     ]
 
     try:
@@ -3326,35 +3345,39 @@ def Extract(archive, db, project = "FreeNAS", key = None, args = []):
         Extract_usage()
 
     for o, a in opts:
-        if o in ("--full"):
-            full = True
-        elif o in ("--dest"):
+        if o in ("--dest"):
             dest = a
+        elif o in ("--train"):
+            train = a
+        elif o in ("--tar"):
+            tarball = True
         else:
             print("Unknown option %s" % o, file=sys.stderr)
             Extract_usage()
 
-    if len(args) != 1:
-        print("Incorrect number of arguments (%d)" % len(args), file=sys.stderr)
+    if train is None and len(args) == 0:
         Extract_usage()
 
-    sequence = args[0]
-    
-
-    # This allows "extract FreeNAS-9.3-Nightlies/LATEST" to work.
-    if "/" in sequence:
-        (train, sequence) = sequence.split("/")
-        print("train = %s, sequence = %s" % (train, sequence), file=sys.stderr)
-        if train is None or sequence is None:
-            print("Don't know how to handle %s" % args[0], file=sys.stderr)
-            sys.exit(1)
+    if len(args) == 0:
+        # We've been given a train, so we just get the latest sequence
+        sequence = "LATEST"
         manifest_file = os.path.join(archive, train, sequence)
     else:
-        train = db.TrainForSequence(sequence)
-        if train is None:
-            print("Sequence %s does not seem to exist" % sequence, file=sys.stderr)
-            sys.exit(1)
-        manifest_file = os.path.join(archive, train, project + "-" +  sequence)
+        sequence = args[0]
+        # This allows "extract FreeNAS-9.3-Nightlies/LATEST" to work.
+        if "/" in sequence:
+            (train, sequence) = sequence.split("/")
+            print("train = %s, sequence = %s" % (train, sequence), file=sys.stderr)
+            if train is None or sequence is None:
+                print("Don't know how to handle %s" % args[0], file=sys.stderr)
+                sys.exit(1)
+            manifest_file = os.path.join(archive, train, sequence)
+        else:
+            train = db.TrainForSequence(sequence)
+            if train is None:
+                print("Sequence %s does not seem to exist" % sequence, file=sys.stderr)
+                sys.exit(1)
+            manifest_file = os.path.join(archive, train, project + "-" +  sequence)
     
     man = Manifest.Manifest()
     try:
@@ -3412,19 +3435,26 @@ def Extract(archive, db, project = "FreeNAS", key = None, args = []):
     man.SignWithKey(key)
     
     if dest is None:
-        dest = os.path.join("/tmp", man.Sequence())
+        if tarball:
+            dest = tempfile.mkdtemp(prefix="ExtractTempDir-")
+            temp_dest = os.path.join("/tmp", man.Sequence() + ".tgz")
+        else:
+            dest = os.path.join("/tmp", man.Sequence())
+            try:
+                os.makedirs(dest)
+            except BaseException as e:
+                print("Unable to create destination directory %s: %s" % (dest, str(e)), file=sys.stderr)
+                sys.exit(1)
+    elif tarball:
+        temp_dest = dest
+        dest = tempfile.mkdtemp(prefix="ExtractTempDir-")
         
-    try:
-        os.makedirs(os.path.join(dest, "Packages"))
-    except BaseException as e:
-        print("Cannot create destination bundle directory %s" % dest, file=sys.stderr)
-        sys.exit(1)
-        
+
     for pkg_file in pkg_files:
         import shutil
         try:
             dst_file = os.path.basename(pkg_file)
-            dst_file = os.path.join(dest, "Packages", dst_file)
+            dst_file = os.path.join(dest, dst_file)
             shutil.copy(pkg_file, dst_file)
         except BaseException as e:
             print("Unable to copy package file %s: %s" % (os.path.basename(pkg_file), str(e)), file=sys.stderr)
@@ -3487,7 +3517,28 @@ def Extract(archive, db, project = "FreeNAS", key = None, args = []):
                     print("Unable to create update script %s for package %s: %s" % (n, pkg_name, str(e)), file=sys.stderr)
                     sys.exit(1)
                     
-    man.StorePath(os.path.join(dest, "%s-MANIFEST" % project))
+    try:
+        clog = open(os.path.join(archive, train, "ChangeLog.txt"))
+        with open(os.path.join(dest, "ChangeLog.txt"), "w") as f:
+            f.write(clog.read())
+        clog.close()
+    except:
+        pass
+    man.StorePath(os.path.join(dest, "MANIFEST"))
+    if tarball:
+        # temp_dest has the name it should use, dest is the directory
+        import subprocess
+        import shutil
+        tar_args = ["/usr/bin/tar", "-zcf", temp_dest, "-C", dest, "."]
+        try:
+            subprocess.check_call(tar_args)
+        except BaseException as e:
+            print("Unable to create tar file %s: %s" % (temp_dest, str(e)))
+            sys.exit(1)
+        shutil.rmtree(dest, ignore_errors=True)
+        print(temp_dest)
+    else:
+        print(dest)
     
 def main():
     global debug, verbose

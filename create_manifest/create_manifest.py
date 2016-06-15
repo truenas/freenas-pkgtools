@@ -1,5 +1,6 @@
-#!/usr/local/bin/python3 -R
-            
+#!/usr/bin/env /usr/local/bin/python
+from __future__ import print_function
+
 import os
 import sys
 import time

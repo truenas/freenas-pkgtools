@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import json
 import logging
@@ -447,8 +448,7 @@ class Manifest(object):
             log.debug("Verify command = %s" % verify_cmd)
 
             temp = self.dict().copy()
-            if SIGNATURE_KEY in temp:
-                temp.pop(SIGNATURE_KEY)
+            temp.pop(SIGNATURE_KEY, None)
             canonical = MakeString(temp)
             if len(canonical) < 10 * 1024:
                 # I think we can have 10k arguments in freebsd
@@ -500,8 +500,7 @@ class Manifest(object):
 
             # Generate a canonical representation of the manifest
             temp = self.dict()
-            if SIGNATURE_KEY in temp:
-                temp.pop(SIGNATURE_KEY)
+            temp.pop(SIGNATURE_KEY, None)
             tstr = MakeString(temp)
 
             # Sign it.

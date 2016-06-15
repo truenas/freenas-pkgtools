@@ -22,7 +22,15 @@ VERIFIER_HELPER = "/usr/local/libexec/verify_signature"
 SIGNATURE_FAILURE = True
 
 # TODO: Add FN10's equivalent of get_sw_name (for TN10 when applicable)
-
+try:
+    import sys
+    sys.path.append("/usr/local/www")
+    from freenasUI.common.system import get_sw_name
+    _os_type = get_sw_name()
+    UPDATE_SERVER = "http://update.freenas.org/" + _os_type
+    MASTER_UPDATE_SERVER = "http://update-master.freenas.org/" + _os_type
+except:
+    pass
 
 def Avatar():
     return _os_type

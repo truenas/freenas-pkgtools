@@ -31,12 +31,9 @@ REVISION!=	git rev-parse --short HEAD
 REVISION=	1
 .endif
 
-PYTHON_PKGNAMEPREFIX=	py34-
 RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}openssl \
 		${PYTHON_PKGNAMEPREFIX}sqlite3 \
-		python \
-		python3 \
-		python34
+		python
 
 .ORDER:	install package
 

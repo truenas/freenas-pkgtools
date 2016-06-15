@@ -46,12 +46,6 @@ PkgFileFullOnly = "full-only"
 
 
 SERVICES = {
-    "gui": {
-        "Name": "gui",
-        "ServiceName": "gui",
-        "Description": "Restart Web UI (forces a logout)",
-        "CheckStatus": False,
-    },
     "SMB": {
         "Name": "CIFS",
         "ServiceName": "cifs",
@@ -92,6 +86,28 @@ SERVICES = {
     #    "DirectoryServices" : {
     #        "Name" : "Restart directory services",
 }
+def IsFN9():
+    """
+    This returns whether or not we're running on Free/TrueNAS 9.
+    This is necessary because the service-related tasks are
+    handled differently in FN9 vs FN10.
+    """
+    return os.path.exists("/usr/local/www/freenasUI")
+
+if IsFN9():
+    SERVICES["WebUI"] = {
+        "Name": "WebUI",
+        "ServiceName": "django",
+        "Description": "Restart Web UI (forces a logout)",
+        "CheckStatus": False,
+    }
+else:
+    SERVICES["gui"] = {
+        "Name": "gui",
+        "ServiceName": "gui",
+        "Description": "Restart Web UI (forces a logout)",
+        "CheckStatus": False,
+    }
 
 
 def GetServiceDescription(svc):
@@ -117,6 +133,44 @@ def StopServices(svc_list):
     were stopped.
     """
     retval = []
+    if IsFN9():
+        old_path = []
+        old_environ = None
+        if "DJANGO_SETTINGS_MODULE" not in os.environ:
+            old_environ = True
+            os.environ["DJANGO_SETTINGS_MODULE"] = "freenasUI.settings"
+        if "/usr/local/www" not in sys.path:
+            old_path.append("/usr/local/www")
+            sys.path.append("/usr/local/www")
+        if "/usr/local/www/freenasUI" not in sys.path:
+            old_path.append("/usr/local/www/freenasUI")
+            sys.path.append("/usr/local/www/freenasUI")
+
+        from django.db.models.loading import cache
+        cache.get_apps()
+
+        from freenasUI.middleware.notifier import notifier
+        n = notifier()
+        # Hm, this doesn't handle any particular ordering.
+        # May need to fix this.
+        for svc in svc_list:
+            if svc not in SERVICES:
+                raise ValueError("%s is not a known service" % svc)
+            s = SERVICES[svc]
+            svc_name = s["ServiceName"]
+            log.debug("StopServices:  svc %s maps to %s" % (svc, svc_name))
+            if (not s["CheckStatus"]) or n.started(svc_name):
+                retval.append(svc)
+                n.stop(svc_name)
+            else:
+                log.debug("svc %s is not started" % svc)
+
+        # Should I remove the environment settings?
+        if old_environ:
+            os.environ.pop("DJANGO_SETTINGS_MODULE")
+        for p in old_path:
+            sys.path.remove(p)
+    else:
     # Hm, this doesn't handle any particular ordering.
     # May need to fix this.
     # TODO: Uncomment the below when freenas10 is ready for rebootless updates
@@ -132,6 +186,7 @@ def StopServices(svc_list):
     #         n.stop(svc_name)
     #     else:
     #         log.debug("svc %s is not started" % svc)
+        pass
     return retval
 
 
@@ -140,15 +195,40 @@ def StartServices(svc_list):
     Start a set of services.  THis is the output
     from StopServices
     """
-    # Hm, this doesn't handle any particular ordering.
-    # May need to fix this.
-    # TODO: Uncomment the below when freenas10 is ready for rebootless updates
-    # But also fix it for being appropriate to freenas10
-    # for svc in svc_list:
-    #     if not svc in SERVICES:
-    #         raise ValueError("%s is not a known service" % svc)
-    #     svc_name = SERVICES[svc]["ServiceName"]
-    #     n.start(svc_name)
+    if IsFN9():
+        old_path = []
+        old_environ = None
+        if "DJANGO_SETTINGS_MODULE" not in os.environ:
+            old_environ = True
+            os.environ["DJANGO_SETTINGS_MODULE"] = "freenasUI.settings"
+        if "/usr/local/www" not in sys.path:
+            old_path.append("/usr/local/www")
+            sys.path.append("/usr/local/www")
+        if "/usr/local/www/freenasUI" not in sys.path:
+            old_path.append("/usr/local/www/freenasUI")
+            sys.path.append("/usr/local/www/freenasUI")
+
+        from django.db.models.loading import cache
+        cache.get_apps()
+
+        from freenasUI.middleware.notifier import notifier
+        n = notifier()
+        # Hm, this doesn't handle any particular ordering.
+        # May need to fix this.
+        for svc in svc_list:
+            if svc not in SERVICES:
+                raise ValueError("%s is not a known service" % svc)
+            svc_name = SERVICES[svc]["ServiceName"]
+            n.start(svc_name)
+
+        # Should I remove the environment settings?
+        if old_environ:
+            os.environ.pop("DJANGO_SETTINGS_MODULE")
+        for p in old_path:
+            sys.path.remove(p)
+
+    else:
+        pass
     return
 
 
@@ -464,14 +544,14 @@ def CreateClone(name, bename=None, rename=None):
     else:
         args.append(name)
 
-    if not RunCommand(dsinit, ["--lock"]):
+    if os.path.exists(dsinit) and not RunCommand(dsinit, ["--lock"]):
         return False
 
     rv = RunCommand(beadm, args)
     if rv is False:
         return False
 
-    if not RunCommand(dsinit, ["--unlock"]):
+    if os.path.exists(dsinit) and not RunCommand(dsinit, ["--unlock"]):
         return False
 
     if rename:
@@ -1131,7 +1211,7 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False):
             else:
                 log.error("Unknown package operation %s for %s" % (op, pkg.Name()))
 
-    if new_manifest.Sequence().startswith(Avatar() + "-"):
+    if new_manifest.Version().startswith(Avatar() + "-"):
         new_boot_name = new_manifest.Version()[len(Avatar() + "-"):]
     else:
         new_boot_name = "%s-%s" % (Avatar(), new_manifest.Version()[len(Avatar() + "-"):])

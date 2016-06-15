@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import errno
@@ -164,9 +165,9 @@ def RemoveFile(path):
         pass
     try:
         os.unlink(path)
-    except FileNotFoundError:
-        return True
-    except OSError as e:
+    except (IOError, OSError) as e:
+        if e.errno == errno.ENOENT:
+            return True
         if debug:
             log.debug("RemoveFile(%s):  errno = %d" % (path, e.errno))
         return False
@@ -210,7 +211,7 @@ def SetPosix(path, meta):
     amroot = os.geteuid() == 0
     try:
         os.lchown(path, meta[TAR_UID_KEY], meta[TAR_GID_KEY])
-    except os.error as e:
+    except (IOError, OSError) as e:
         # If we're not root, we can't do the chown
         if e.errno != errno.EPERM and amroot:
             raise e
@@ -505,8 +506,9 @@ def ExtractEntry(tf, entry, root, prefix=None, mFileHash=None):
         # If the directory already exists, we don't care.
         try:
             os.makedirs(full_path)
-        except FileExistsError:
-            pass
+        except (IOError, OSError) as e:
+            if e.errno != errno.EEXIST:
+                raise
         SetPosix(full_path, meta)
 
         type = "dir"
@@ -531,8 +533,8 @@ def ExtractEntry(tf, entry, root, prefix=None, mFileHash=None):
         # Then create the new one.
         try:
             os.unlink(full_path)
-        except PermissionError as e:
-            if os.path.isdir(full_path):
+        except (OSError, IOError) as e:
+            if e.errno == errno.EPERM and os.path.isdir(full_path):
                 # You can't unlink a directory these days.
                 import shutil
                 try:
@@ -541,11 +543,9 @@ def ExtractEntry(tf, entry, root, prefix=None, mFileHash=None):
                 except BaseException as e2:
                     log.error("Couldn't rmtree %s: %s" % (full_path, str(e2)))
                     raise e2
-        except FileNotFoundError as e:
-            pass
-        except OSError as e:
-            log.error("Couldn't unlink %s: %s" % (full_path, e))
-            raise e
+            elif e.errno != errno.ENOENT:
+                log.error("Couldn't unlink %s: %s" % (full_path, e))
+                raise
         os.symlink(entry.linkname, full_path)
         SetPosix(full_path, meta)
         type = "slink"
@@ -561,7 +561,7 @@ def ExtractEntry(tf, entry, root, prefix=None, mFileHash=None):
                 pass
             try:
                 os.link(source_file, full_path)
-            except OSError as e:
+            except (IOError, OSError) as e:
                 if e.errno == errno.EXDEV:
                     log.debug("Unable to link %s -> %s, trying a copy" % (source_file, full_path))
                     # Cross-device link, so we'll just copy it
@@ -585,7 +585,7 @@ def ExtractEntry(tf, entry, root, prefix=None, mFileHash=None):
             if st.st_flags != 0:
                 os.lchflags(source_file, st.st_flags)
 
-        except OSError as e:
+        except (IOError, OSError) as e:
             log.error("Could not link %s to %s: %s" % (source_file, full_path, str(e)))
             sys.exit(1)
         # Except on mac os, hard links are always files.

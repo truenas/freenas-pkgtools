@@ -1,5 +1,6 @@
-#!/usr/local/bin/python3 -R
+#!/usr/bin/env /usr/local/bin/python
 # Create a pkgng-like package from a directory.
+from __future__ import print_function
 
 import os, sys, stat, re
 import json
@@ -7,7 +8,10 @@ import tarfile
 import getopt
 import hashlib
 import io
-import configparser
+if sys.version_info[0] == 2:
+    import ConfigParser as configparser
+else:
+    import configparser
 import subprocess
 import tempfile
 
@@ -238,6 +242,7 @@ def LoadTemplate(path):
 def main():
     global debug, verbose
     # Some valid, but stupid, defaults.
+    # "arch" isn't used by the freenas package system
     manifest = {
         "www" : "http://www.freenas.org",
         "arch" : "freebsd:10:x86:64",
@@ -401,8 +406,7 @@ def main():
 
     # I would LOVE to be able to use xz, but python's tarfile does not
     # (as of when I write this) support it.  Python 3 has it.
-    temp_file = output.rsplit('.', 1)[0] + '.tar'
-    tf = tarfile.open(temp_file, "w", format = tarfile.PAX_FORMAT)
+    tf = tarfile.open(output, "w:gz", format = tarfile.PAX_FORMAT)
 
     # Add the manifest string as the file "+MANIFEST"
     mani_file_info = tarfile.TarInfo(name = "+MANIFEST")
@@ -421,15 +425,6 @@ def main():
         tf.add(root + dir, arcname = dir, recursive = False)
 
     tf.close()
-
-    if os.path.exists('/usr/local/bin/pigz'):
-        subprocess.Popen("/usr/local/bin/pigz -c -9 {0} > {1}".format(temp_file, output), shell=True).wait()
-    else:
-        subprocess.Popen("gzip -c -9 {0} > {1}".format(temp_file, output), shell=True).wait()
-    try:
-        os.unlink(temp_file)
-    except:
-        pass
 
     return 0
 

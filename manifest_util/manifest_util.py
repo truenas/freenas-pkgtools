@@ -1,4 +1,5 @@
-#!/usr/local/bin/python3 -R
+#!/usr/bin/env /usr/local/bin/python
+from __future__ import print_function
 
 """
 Utility to manage a manifest file.
