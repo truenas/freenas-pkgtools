@@ -5,6 +5,7 @@ import sys
 import getopt
 import stat
 import fcntl
+import shutil
 
 sys.path.append("/usr/local/lib")
 
@@ -3368,7 +3369,7 @@ or	{0} extract [--dest dest] [--tar] --train=TRAIN""".format(sys.argv[0]), file=
         if "/" in sequence:
             (train, sequence) = sequence.split("/")
             print("train = %s, sequence = %s" % (train, sequence), file=sys.stderr)
-            if train is None or sequence is None:
+            if not train train or not sequence:
                 print("Don't know how to handle %s" % args[0], file=sys.stderr)
                 sys.exit(1)
             manifest_file = os.path.join(archive, train, sequence)
@@ -3451,7 +3452,6 @@ or	{0} extract [--dest dest] [--tar] --train=TRAIN""".format(sys.argv[0]), file=
         
 
     for pkg_file in pkg_files:
-        import shutil
         try:
             dst_file = os.path.basename(pkg_file)
             dst_file = os.path.join(dest, dst_file)
@@ -3518,10 +3518,7 @@ or	{0} extract [--dest dest] [--tar] --train=TRAIN""".format(sys.argv[0]), file=
                     sys.exit(1)
                     
     try:
-        clog = open(os.path.join(archive, train, "ChangeLog.txt"))
-        with open(os.path.join(dest, "ChangeLog.txt"), "w") as f:
-            f.write(clog.read())
-        clog.close()
+        shutil.copy(os.path.join(archive, train, "ChangeLog.txt"), os.path.join(dest, "ChangeLog.txt"))
     except:
         pass
     man.StorePath(os.path.join(dest, "MANIFEST"))
