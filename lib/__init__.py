@@ -12,7 +12,7 @@ UPDATE_SERVER = "http://update.freenas.org/" + _os_type
 MASTER_UPDATE_SERVER = "http://update-master.freenas.org/" + _os_type
 
 # For signature verification
-IX_CRL = "https://web.ixsystems.com/updates/ix_crl.pem"
+IX_CRL = "http://update-master.freenas.org/updates/ix_crl.pem"
 DEFAULT_CA_FILE = "/usr/local/share/certs/ca-root-nss.crt"
 IX_ROOT_CA_FILE = "/usr/local/share/certs/iX-CA.pem"
 UPDATE_CERT_DIR = "/usr/local/share/certs"

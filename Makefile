@@ -33,6 +33,7 @@ REVISION=	1
 
 RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}openssl \
 		${PYTHON_PKGNAMEPREFIX}sqlite3 \
+		${PYTHON_PKGNAMEPREFIX}six \
 		python
 
 .ORDER:	install package

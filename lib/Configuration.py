@@ -7,20 +7,19 @@ import tempfile
 import time
 import socket
 import ssl
-if sys.version_info[0] == 2:
-    import ConfigParser as configparser
-    from urllib2 import Request, urlopen, HTTPError, URLError, HTTPSHandler, AbstractHTTPHandler
-    from urllib2 import build_opener
-    from httplib import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
-    from httplib import HTTPException, HTTPConnection, HTTPS_PORT
-else:
-    import configparser
-    from urllib.request import Request, urlopen, HTTPSHandler, AbstractHTTPHandler
-    from urllib.request import build_opener
-    from urllib.error import HTTPError, URLError
-    import urllib.request, urllib.error, urllib.parse
-    from http.client import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
-    from http.client import HTTPException, HTTPConnection, HTTPS_PORT
+import six
+
+import six.moves.configparser as configparser
+from six.moves.urllib.request import Request
+from six.moves.urllib.error import HTTPError, URLError
+from six.moves.urllib.request import Request, urlopen, HTTPSHandler
+from six.moves.urllib.request import build_opener
+from six.moves.http_client import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
+from six.moves.http_client import HTTPException, HTTPConnection, HTTPS_PORT
+if six.PY2:
+    from urllib2 import AbstractHTTPHandler
+elif six.PY3:
+    from urllib.request import AbstractHTTPHandler
 
 from . import Avatar, UPDATE_SERVER, MASTER_UPDATE_SERVER
 from . import Exceptions
@@ -115,11 +114,11 @@ class CertValidatingHTTPSConnection(HTTPConnection):
 
     def __init__(self, host, port=None, key_file=None, cert_file=None,
                              ca_certs=None, strict=None, **kwargs):
-        if sys.version_info[0] > 2:
+        if six.PY2:
+            HTTPConnection.__init__(self, host=host, port=port, strict=strict, **kwargs)
+        else:
             # python3's HTTPConnection dropped the strict argument.
             HTTPConnection.__init__(self, host=host, port=port, **kwargs)
-        else:
-            HTTPConnection.__init__(self, host=host, port=port, strict=strict, **kwargs)
         self.key_file = key_file
         self.cert_file = cert_file
         self.ca_certs = ca_certs
