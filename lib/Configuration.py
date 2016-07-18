@@ -714,7 +714,7 @@ class Configuration(object):
                     if percent != lastpercent:
                         handler(
                             'network',
-                            file_url,
+                            url,
                             size=totalsize,
                             progress=percent,
                             download_rate=downrate,
@@ -722,7 +722,7 @@ class Configuration(object):
                     lastpercent = percent
                 retval.write(data)
         except Exception as e:
-            log.debug("Got exception %s" % str(e))
+            log.debug("Got exception %s" % str(e), exc_info=True)
             if intr_ok is False and pathname:
                 os.unlink(pathname)
             raise e
