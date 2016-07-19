@@ -356,7 +356,7 @@ def PruneClones(cb=None):
         mbytes_min = 2 * 1024 * 1024
         if (size - used) < mbytes_min:
             return False
-        if ((used * 100.0) / size) < 80.0:
+        if ((used * 100.0) / size) > 80.0:
             return False
         return True
 
@@ -527,58 +527,61 @@ def CreateClone(name, bename=None, rename=None):
     # pre-${name} to ${rename}.  In the event of
     # an error anywhere along, we undo as much as we can
     # and return an error.
-    args = ["create"]
-    if bename:
-        # Due to how beadm works, if we are given a starting name,
-        # we need to find the real name.
-        cl = FindClone(bename)
-        if cl is None:
-            log.error("CreateClone:  Cannot find starting clone %s" % bename)
+    if PruneClones():
+        args = ["create"]
+        if bename:
+            # Due to how beadm works, if we are given a starting name,
+            # we need to find the real name.
+            cl = FindClone(bename)
+            if cl is None:
+                log.error("CreateClone:  Cannot find starting clone %s" % bename)
+                return False
+            log.debug("FindClone returned %s" % cl)
+            args.extend(["-e", cl["realname"]])
+        if rename:
+            temp_name = "Pre-%s-%d" % (name, random.SystemRandom().randint(0, 1024 * 1024))
+            args.append(temp_name)
+            log.debug("CreateClone with rename, temp_name = %s" % temp_name)
+        else:
+            args.append(name)
+
+        if os.path.exists(dsinit) and not RunCommand(dsinit, ["--lock"]):
             return False
-        log.debug("FindClone returned %s" % cl)
-        args.extend(["-e", cl["realname"]])
-    if rename:
-        temp_name = "Pre-%s-%d" % (name, random.SystemRandom().randint(0, 1024 * 1024))
-        args.append(temp_name)
-        log.debug("CreateClone with rename, temp_name = %s" % temp_name)
+
+        rv = RunCommand(beadm, args)
+        if rv is False:
+            return False
+
+        if os.path.exists(dsinit) and not RunCommand(dsinit, ["--unlock"]):
+            return False
+
+        if rename:
+            # We've created Pre-<newname>-<random>
+            # Now we want to reame the root environment, which is rename, to
+            # the new name.
+            args = ["rename", rename, name]
+            rv = RunCommand(beadm, args)
+            if rv is False:
+                # We failed.  Clean up the temp one
+                args = ["destroy", "-F", temp_name]
+                RunCommand(beadm, args)
+                return False
+            # Root has been renamed, so let's rename the temporary one
+            args = ["rename", temp_name, rename]
+            rv = RunCommand(beadm, args)
+            if rv is False:
+                # We failed here.  How annoying.
+                # So let's delete the newlyp-created BE
+                # and rename root
+                args = ["destroy", "-F", rename]
+                RunCommand(beadm, args)
+                args = ["rename", name, rename]
+                RunCommand(beadm, args)
+                return False
+
+        return True
     else:
-        args.append(name)
-
-    if os.path.exists(dsinit) and not RunCommand(dsinit, ["--lock"]):
         return False
-
-    rv = RunCommand(beadm, args)
-    if rv is False:
-        return False
-
-    if os.path.exists(dsinit) and not RunCommand(dsinit, ["--unlock"]):
-        return False
-
-    if rename:
-        # We've created Pre-<newname>-<random>
-        # Now we want to reame the root environment, which is rename, to
-        # the new name.
-        args = ["rename", rename, name]
-        rv = RunCommand(beadm, args)
-        if rv is False:
-            # We failed.  Clean up the temp one
-            args = ["destroy", "-F", temp_name]
-            RunCommand(beadm, args)
-            return False
-        # Root has been renamed, so let's rename the temporary one
-        args = ["rename", temp_name, rename]
-        rv = RunCommand(beadm, args)
-        if rv is False:
-            # We failed here.  How annoying.
-            # So let's delete the newlyp-created BE
-            # and rename root
-            args = ["destroy", "-F", rename]
-            RunCommand(beadm, args)
-            args = ["rename", name, rename]
-            RunCommand(beadm, args)
-            return False
-
-    return True
 
 
 def RenameClone(oldname, newname):
