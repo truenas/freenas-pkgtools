@@ -242,7 +242,7 @@ def DoUpdate(cache_dir, verbose):
 
     if not diffs:
         log.debug("No updates to apply")
-        return
+        return False
     
     try:
         rv = Update.ApplyUpdate(cache_dir)
@@ -252,7 +252,7 @@ def DoUpdate(cache_dir, verbose):
     if rv and verbose:
         print("System should be rebooted now", file=sys.stderr)
 
-    return
+    return rv
         
 def main():
     global log
@@ -288,7 +288,7 @@ def main():
     }
 
     def usage():
-        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [-v] <cmd>
+        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [-v] <cmd>
 or	{0} <update_tar_file>
 where cmd is one of:
         check\tCheck for updates
@@ -296,10 +296,11 @@ where cmd is one of:
         sys.exit(1)
 
     try:
-        short_opts = "C:dT:v"
+        short_opts = "C:dRT:v"
         long_opts = [
             "cache=",
             "debug",
+            "reboot",
             "train=",
             "verbose",
             "no-delta",
@@ -310,6 +311,7 @@ where cmd is one of:
         print(str(err), file=sys.stderr)
         usage()
 
+    do_reboot = False
     verbose = False
     debug = 0
     config = None
@@ -326,6 +328,8 @@ where cmd is one of:
             debug += 1
         elif o in ('-C', "--cache"):
             cache_dir = a
+        elif o in ("-R", "--reboot"):
+            do_reboot = True
         elif o in ("-T", "--train"):
             train = a
         elif o in ("--no-delta"):
@@ -378,18 +382,6 @@ where cmd is one of:
         # want to run "freenas-update -c /foo check" to look for an update,
         # and it will download the latest one as necessary, and then run
         # "freenas-update -c /foo update" if it said there was an update.
-        try:
-            update_opts, update_args = getopt.getopt(args[1:], "R", "--reboot")
-        except getopt.GetoptError as err:
-            print(str(err), file=sys.stderr)
-            usage()
-
-        force_reboot = False
-        for o, a in update_opts:
-            if o in ("-R", "--reboot"):
-                force_reboot = True
-            else:
-                assert False, "Unhandled option {0}".format(o)
 
         # See if the cache directory has an update downloaded already
         do_download = True
@@ -408,13 +400,23 @@ where cmd is one of:
 
         if do_download:
             rv = DoDownload(train, cache_dir, pkg_type, verbose)
-
+            if rv is False:
+                if verbose:
+                    print("No updates available")
+                Update.RemoveUpdate(cache_dir)
+                sys.exit(1)
+                
         try:
-            DoUpdate(cache_dir, verbose)
+            rv = DoUpdate(cache_dir, verbose)
         except:
             sys.exit(1)
         else:
-            sys.exit(0)
+            if rv:
+                if do_reboot:
+                    os.system("/sbin/shutdown -r now")
+                sys.exit(0)
+            else:
+                sys.exit(1)
     else:
         # If it's not a tarfile (possibly because it doesn't exist),
         # print usage and exit.
@@ -451,11 +453,16 @@ where cmd is one of:
             s.write(config.UpdateServerName())
 
         try:
-            DoUpdate(cache_dir, verbose)
+            rv = DoUpdate(cache_dir, verbose)
         except:
             sys.exit(1)
         else:
-            sys.exit(0)
+            if rv:
+                if do_reboot:
+                    os.system("/sbin/shutdown -r now")
+                sys.exit(0)
+            else:
+                sys.exit(1)
             
 if __name__ == "__main__":
     sys.exit(main())
