@@ -1015,14 +1015,15 @@ class Configuration(object):
             else:
                 train = temp_mani.Train()
 
-        file = self.TryGetNetworkFile(url="%s/%s/LATEST" % (self.UpdateServerMaster(), train),
+        mani_file = self.TryGetNetworkFile(url="%s/%s/LATEST" % (self.UpdateServerMaster(), train),
                                       reason="GetLatestManifest",
                                       )
-        if file is None:
+        if mani_file is None:
             log.debug("Could not get latest manifest file for train %s" % train)
         else:
             rv = Manifest.Manifest(self, require_signature=require_signature)
-            rv.LoadFile(file)
+            rv.LoadFile(mani_file)
+            mani_file.close()
         return rv
 
     def CurrentPackageVersion(self, pkgName):

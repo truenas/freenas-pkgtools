@@ -873,6 +873,8 @@ def install_file(pkgfile, dest):
 
         member = t.next()
 
+    t.close()
+    
     if len(pkgFiles) > 0:
         pkgdb.AddFilesBulk(pkgFiles)
 
@@ -926,6 +928,14 @@ class Installer(object):
             raise InstallerConfigurationException("No manifest file")
         return
 
+    def __del__(self):
+        if self._packages:
+            for pkg in self._packages:
+                for pkgname in pkg:
+                    if pkg[pkgname]:
+                        pkg[pkgname].close()
+            self._packages = []
+            
     def SetDebug(self, level):
         global debug
         debug = level

@@ -1028,10 +1028,13 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             log.error("Could not download package file for %s" % pkg.Name())
             RemoveUpdate(directory)
             return False
-
+        else:
+            pkg_file.close()
+            
     # Almost done:  get a changelog if one exists for the train
     # If we can't get it, we don't care.
-    conf.GetChangeLog(train, save_dir=directory, handler=get_handler)
+    with conf.GetChangeLog(train, save_dir=directory, handler=get_handler):
+        pass
     # Then save the manifest file.
     # Create the SEQUENCE file.
     with open(directory + "/SEQUENCE", "w") as f:
@@ -1095,6 +1098,8 @@ def PendingUpdatesChanges(directory):
         except ManifestInvalidSignature as e:
             log.error("Invalid signature in cached manifest: %s" % str(e))
             raise
+        finally:
+            mani_file.close()
         # This returns a set of differences.
         # But we shouldn't rely on it until we can look at what we've
         # actually downloaded.  To do that, we need to look at any
