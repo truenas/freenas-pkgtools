@@ -117,30 +117,25 @@ def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
     Extract the files in the given tarball into dest_dir.
     This assumes dest_dir already exists.
     """
-    try:
-        tf = tarfile.open(tarball)
-    except BaseException as e:
-        print("Unable to open tarball {0}: {1}".format(tarball, str(e)), file=sys.stderr)
-        sys.exit(1)
-    files = tf.getmembers()
-    for f in files:
-        if f.name in ("./", ".", "./."):
-            continue
-        if not f.name.startswith("./"):
+    with tarfile.open(tarball) as tf:
+        files = tf.getmembers()
+        for f in files:
+            if f.name in ("./", ".", "./."):
+                continue
+            if not f.name.startswith("./"):
+                if verbose:
+                    print("Illegal member {0}".format(f), file=sys.stderr)
+                continue
+            if len(f.name.split("/")) != 2:
+                if verbose:
+                    print("Illegal member name {0} has too many path components".format(f.name), file=sys.stderr)
+                continue
             if verbose:
-                print("Illegal member {0}".format(f), file=sys.stderr)
-            continue
-        if len(f.name.split("/")) != 2:
+                print("Extracting {0}".format(f.name), file=sys.stderr)
+            tf.extract(f.name, path=dest_dir)
             if verbose:
-                print("Illegal member name {0} has too many path components".format(f.name), file=sys.stderr)
-            continue
-        if verbose:
-            print("Extracting {0}".format(f.name), file=sys.stderr)
-        tf.extract(f.name, path=dest_dir)
-        if verbose:
-            print("Done extracting {0}".format(f.name), file=sys.stderr)
+                print("Done extracting {0}".format(f.name), file=sys.stderr)
     return True
-
 
 def PrintDifferences(diffs):
     for type in diffs:
