@@ -129,7 +129,7 @@ def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
             if len(f.name.split("/")) != 2:
                 if verbose:
                     print("Illegal member name {0} has too many path components".format(f.name), file=sys.stderr)
-                    continue
+                continue
             if verbose:
                 print("Extracting {0}".format(f.name), file=sys.stderr)
             tf.extract(f.name, path=dest_dir)
