@@ -931,9 +931,9 @@ class Installer(object):
     def __del__(self):
         if self._packages:
             for pkg in self._packages:
-                for pkgname in pkg:
-                    if pkg[pkgname]:
-                        pkg[pkgname].close()
+                for pkgfile in pkg.values():
+                    if pkgfile:
+                        pkgfile.close()
             self._packages = []
             
     def SetDebug(self, level):
