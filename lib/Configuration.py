@@ -59,14 +59,6 @@ TRAIN_CHECKED_KEY = "LastChecked"
 
 log = logging.getLogger('freenasOS.Configuration')
 
-# Change this for release
-# Need to change search code since it isn't really
-# searching any longer.
-# We may want to use a different update server for
-# TrueNAS.
-# UPDATE_SERVER = "http://beta-update.freenas.org/" + Avatar()
-SEARCH_LOCATIONS = ["http://update.freenas.org/" + Avatar()]
-
 # List of trains
 TRAIN_FILE = "trains.txt"
 
@@ -867,9 +859,6 @@ class Configuration(object):
         raise Exception("Deprecated method")
         self._search = list
         return
-
-    def SearchLocations(self):
-        return SEARCH_LOCATIONS
 
     def AddTrain(self, train):
         self._trains.append(train)
