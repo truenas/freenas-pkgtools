@@ -3,7 +3,6 @@ from __future__ import print_function
 
 import getopt
 import logging
-import logging.config
 import os
 import sys
 import tarfile
@@ -14,6 +13,7 @@ sys.path.append("/usr/local/lib")
 import freenasOS.Configuration as Configuration
 import freenasOS.Update as Update
 import freenasOS.Exceptions as Exceptions
+from freenasOS import log_to_stderr
 
 
 class ProgressBar(object):
@@ -238,7 +238,7 @@ def DoUpdate(cache_dir, verbose):
     if not diffs:
         log.debug("No updates to apply")
         return False
-    
+
     try:
         rv = Update.ApplyUpdate(cache_dir)
     except BaseException as e:
@@ -248,39 +248,10 @@ def DoUpdate(cache_dir, verbose):
         print("System should be rebooted now", file=sys.stderr)
 
     return rv
-        
+
+
 def main():
     global log
-
-    log_config_dict = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'simple': {
-                'format': '[%(name)s:%(lineno)s] %(message)s',
-            },
-        },
-        'filters': {
-            'cleandownload': {
-                '()': StartsWithFilter,
-                'params': ['TryGetNetworkFile', 'Searching']
-            }
-        },
-        'handlers': {
-            'std': {
-                'class': 'logging.StreamHandler',
-                'level': 'DEBUG',
-                'stream': 'ext://sys.stderr',
-            },
-        },
-        'loggers': {
-            '': {
-                'handlers': ['std'],
-                'level': 'DEBUG',
-                'propagate': True,
-            },
-        },
-    }
 
     def usage():
         print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [-v] <cmd>
@@ -334,9 +305,8 @@ where cmd is one of:
         else:
             assert False, "unhandled option {0}".format(o)
 
-    if not verbose:
-        log_config_dict['handlers']['std']['filters'] = ['cleandownload']
-    logging.config.dictConfig(log_config_dict)
+    if verbose:
+        log_to_stderr()
     log = logging.getLogger('freenas-update')
 
     config = Configuration.Configuration()
@@ -400,7 +370,7 @@ where cmd is one of:
                     print("No updates available")
                 Update.RemoveUpdate(cache_dir)
                 sys.exit(1)
-                
+
         try:
             rv = DoUpdate(cache_dir, verbose)
         except:
@@ -422,7 +392,7 @@ where cmd is one of:
                 usage()
         except:
             usage()
-        
+
         # Frozen tarball.  We'll extract it into the cache directory, and
         # then add a couple of things to make it pass sanity, and then apply it.
         # For now we just copy the code above.
@@ -458,6 +428,6 @@ where cmd is one of:
                 sys.exit(0)
             else:
                 sys.exit(1)
-            
+
 if __name__ == "__main__":
     sys.exit(main())
