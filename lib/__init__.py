@@ -2,6 +2,7 @@ import logging
 import logging.config
 import math
 import syslog
+import sys
 
 # To use this:
 # from . import Avatar
@@ -27,7 +28,6 @@ SIGNATURE_FAILURE = True
 
 # TODO: Add FN10's equivalent of get_sw_name (for TN10 when applicable)
 try:
-    import sys
     sys.path.append("/usr/local/www")
     from freenasUI.common.system import get_sw_name
     _os_type = get_sw_name()
@@ -100,7 +100,6 @@ test_logger = logging.getLogger(__name__)
 log_config_dict = {
     'version': 1,
     'disable_existing_loggers': False,
-    'incremental': test_logger.hasHandlers(),
     'formatters': {
         'simple': {
             'format': '[%(name)s:%(lineno)s] %(message)s',
@@ -123,16 +122,18 @@ log_config_dict = {
             'level': 'DEBUG',
             'class': 'freenasOS.SysLogHandler',
             'formatter': 'simple'
-        },
-    },
-    'loggers': {
+        }
+    }
+}
+
+if not test_logger.hasHandlers():
+    log_config_dict['loggers'] = {
         '': {
             'handlers': ['syslog'],
             'level': 'DEBUG',
-            'propagate': True,
-        },
-    },
-}
+            'propagate': True
+        }
+    }
 
 
 def disable_trygetfilelogs():
@@ -141,8 +142,7 @@ def disable_trygetfilelogs():
 
 
 def log_to_stderr():
-    log_config_dict['incremental'] = False
-    log_config_dict['loggers']['handlers'] = ['std']
+    log_config_dict['loggers']['']['handlers'] = ['std']
     logging.config.dictConfig(log_config_dict)
 
 logging.config.dictConfig(log_config_dict)
