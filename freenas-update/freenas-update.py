@@ -90,7 +90,7 @@ class UpdateHandler(object):
             display_rate = ' Rate: {0} B/s'.format(download_rate) if download_rate else ''
             self.details = 'Downloading: {0} Progress:{1}{2}{3}'.format(
                 self.pkgname, progress, display_size, display_rate
-                )
+            )
 
         # Doing the drill below as there is a small window when
         # step*progress logic does not catch up with the new value of step
@@ -98,18 +98,6 @@ class UpdateHandler(object):
             self.master_progress = self.progress
         if self.update_progress is not None:
             self.update_progress(self.master_progress, self.details)
-
-
-class StartsWithFilter(logging.Filter):
-    def __init__(self, params):
-        self.params = params
-
-    def filter(self, record):
-        if self.params:
-            allow = not any(record.msg.startswith(x) for x in self.params)
-        else:
-            allow = True
-        return allow
 
 
 def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
@@ -136,6 +124,7 @@ def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
             if verbose:
                 print("Done extracting {0}".format(f.name), file=sys.stderr)
     return True
+
 
 def PrintDifferences(diffs):
     for type in diffs:
@@ -212,6 +201,7 @@ def DoDownload(train, cache_dir, pkg_type, verbose):
         sys.exit(1)
 
     return rv
+
 
 def DoUpdate(cache_dir, verbose):
     """
