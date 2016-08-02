@@ -91,7 +91,19 @@ class UpdateHandler(object):
             self.details = 'Downloading: {0} Progress:{1}{2}{3}'.format(
                 self.pkgname, progress, display_size, display_rate
             )
+        self.increment_progress()
 
+    def install_handler(self, index, name, packages):
+        self.indeterminate = False
+        total = len(packages)
+        self.numfilesdone = index
+        self.numfilesdone = total
+        self.progress = int((float(index) / float(total)) * 100.0)
+        self.operation = 'Installing'
+        self.details = 'Installing {0}'.format(name)
+        self.increment_progress()
+
+    def increment_progress(self):
         # Doing the drill below as there is a small window when
         # step*progress logic does not catch up with the new value of step
         if self.progress >= self.master_progress:
@@ -230,7 +242,18 @@ def DoUpdate(cache_dir, verbose):
         return False
 
     try:
-        rv = Update.ApplyUpdate(cache_dir)
+        if not verbose:
+            progress_bar = ProgressBar()
+            handler = UpdateHandler(progress_bar.update)
+            rv = Update.ApplyUpdate(
+                cache_dir,
+                install_handler=handler.install_handler,
+            )
+            if rv is False:
+                progress_bar.update(message="Updates were not applied")
+            progress_bar.finish()
+        else:
+            rv = Update.ApplyUpdate(cache_dir)
     except BaseException as e:
         log.error("Unable to apply update: {0}".format(str(e)))
         raise
