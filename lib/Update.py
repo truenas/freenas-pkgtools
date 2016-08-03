@@ -1462,22 +1462,27 @@ def VerifyUpdate(directory):
         fcntl.lockf(mani_file, fcntl.LOCK_EX | fcntl.LOCK_NB, 0, 0)
     except:
         # Well, if we can't acquire the lock, someone else has it.
-        # Throw an incomplete exception
+        # Throw an incomplete exception after closing the file
+        mani_file.close()
         raise UpdateBusyCacheException("Cache directory %s is being modified" % directory)
+
     # We always want a valid signature for an update.
     cached_mani = Manifest.Manifest(require_signature=True)
     try:
         cached_mani.LoadFile(mani_file)
     except Exception as e:
         # If we got an exception, it's invalid.
+        mani_file.close()
         log.error("Could not load cached manifest file: %s" % str(e))
         raise UpdateInvalidCacheException
+
 
     # First easy thing to do:  look for the SEQUENCE file.
     try:
         with open(directory + "/SEQUENCE", "r") as f:
             cached_sequence = f.read().rstrip()
     except (IOError, Exception) as e:
+        mani_file.close()
         log.error("Could not open sequence file in cache directory %s: %s" % (directory, str(e)))
         raise UpdateIncompleteCacheException(
             "Cache directory {0} does not have a sequence file".format(directory)
@@ -1485,6 +1490,7 @@ def VerifyUpdate(directory):
 
     # Now let's see if the sequence matches us.
     if cached_sequence != mani.Sequence():
+        mani_file.close()
         log.error("Cached sequence, %s, does not match system sequence, %s" % (cached_sequence, mani.Sequence()))
         raise UpdateInvalidCacheException("Cached sequence does not match system sequence")
 
@@ -1499,6 +1505,7 @@ def VerifyUpdate(directory):
         cached_server = "default"
 
     if cached_server != conf.UpdateServerName():
+        mani_file.close()
         log.error("Cached server, %s, does not match system update server, %s" % (cached_server, conf.UpdateServerName()))
         raise UpdateInvalidCacheException("Cached server name does not match system update server")
 
@@ -1506,6 +1513,7 @@ def VerifyUpdate(directory):
     validation_program = cached_mani.ValidationProgram(Manifest.VALIDATE_UPDATE)
     if validation_program:
         if not os.path.exists(os.path.join(directory, validation_program["Kind"])):
+            mani_file.close()
             log.error("Validation program %s is required, but not in cache directory" % validation_program["Kind"])
             raise UpdateIncompleteCacheException("Cache directory %s missing validation program %s" % (directory, validation_program["Kind"]))
 
@@ -1528,6 +1536,7 @@ def VerifyUpdate(directory):
             # the same filename twice.
             if not os.path.exists(directory + "/" + pkg.FileName()) and \
                not os.path.exists(directory + "/" + pkg.FileName(cur_vers)):
+                mani_file.close()
                 # Neither exists, so incoplete
                 log.error(
                     "Cache %s directory missing files for package %s" % (directory, pkg.Name())
@@ -1567,6 +1576,7 @@ def VerifyUpdate(directory):
                 except:
                     update = None
             if update is None:
+                mani_file.close()
                 # If we got here, we are missing this file
                 log_msg = "Cache directory %s is missing package %s" % (directory, pkg.Name())
                 log.error(log_msg)

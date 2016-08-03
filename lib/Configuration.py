@@ -1152,7 +1152,7 @@ class Configuration(object):
             except BaseException as e:
                 log.debug("Trying to get %s, got exception %s, continuing" % (pFile, str(e)))
                 continue
-            
+
             if file:
                 if search_attempt["Checksum"]:
                     h = ChecksumFile(file)
@@ -1169,6 +1169,8 @@ class Configuration(object):
                     # No checksum for the file, so we just go with it
                     return file
 
+        if file:
+            file.close()
         if pkg_exception:
             raise pkg_exception
         raise Exceptions.UpdatePackageNotFound(package.Name())
