@@ -38,6 +38,7 @@ VERIFY_SKIP_PATHS = [
     '/etc',
     '/dev',
     '/conf/base/etc/master.passwd',
+    '/compat/linux/proc',
     '/boot/zfs/zpool.cache',
     '/usr/local/share/smartmontools/drivedb.h',
     '/boot/device.hints',
