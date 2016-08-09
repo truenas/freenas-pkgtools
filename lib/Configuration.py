@@ -21,12 +21,10 @@ if six.PY2:
 elif six.PY3:
     from urllib.request import AbstractHTTPHandler
 
-from . import Avatar, UPDATE_SERVER, MASTER_UPDATE_SERVER
-from . import Exceptions
-from . import Installer
-from . import Train
-from . import Package
-from . import Manifest
+from . import (
+    Avatar, UPDATE_SERVER, MASTER_UPDATE_SERVER, Exceptions,
+    Installer, Train, Package, Manifest, DEFAULT_CA_FILE
+)
 
 from stat import (
     S_ISDIR, S_ISCHR, S_ISBLK, S_ISREG, S_ISFIFO, S_ISLNK, S_ISSOCK,
@@ -555,6 +553,7 @@ class Configuration(object):
 
     def UpdateServerMaster(self):
         return self._update_server.master
+
     def UpdateServerURL(self):
         return self._update_server.url
 
@@ -565,8 +564,6 @@ class Configuration(object):
         return self._update_server.signature_required
 
     def TryGetNetworkFile(self, file=None, url=None, handler=None, pathname=None, reason=None, intr_ok=False):
-        from . import DEFAULT_CA_FILE
-
         AVATAR_VERSION = "X-%s-Manifest-Version" % Avatar()
         current_version = "unknown"
         host_id = None
