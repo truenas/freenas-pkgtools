@@ -957,6 +957,7 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
         log.debug("Loaded manifest file")
         log.debug("Cached manifest file has sequence %s, latest_manfest has sequence %s" % (temporary_manifest.Sequence(), latest_mani.Sequence()))
         if temporary_manifest.Sequence() != latest_mani.Sequence():
+            mani_file.close()
             log.debug("Cached sequence is not the latest, so removing")
             RemoveUpdate(directory)
             mani_file = None
