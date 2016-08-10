@@ -600,122 +600,127 @@ class Configuration(object):
 
         read = 0
         retval = None
-        if pathname:
-            if intr_ok:
-                try:
-                    retval = open(pathname, "r+b")
-                    read = os.fstat(retval.fileno()).st_size
-                    retval.seek(read)
-                except:
-                    pass
-            if retval is None:
-                retval = open(pathname, "w+b")
-        else:
-            retval = tempfile.TemporaryFile(dir=self._temp)
-
-        if read > 0:
-            log.debug("File already exists, using a starting size of %d" % read)
-
-        furl = None
-        for url in file_url:
-            url_exc = None
-            try:
-                https_handler = VerifiedHTTPSHandler(ca_certs=DEFAULT_CA_FILE)
-                opener = build_opener(https_handler)
-                req = Request(url)
-                req.add_header("X-iXSystems-Project", Avatar())
-                req.add_header("X-iXSystems-Version", current_version)
-                if host_id:
-                    req.add_header("X-iXSystems-HostID", host_id)
-                if reason:
-                    req.add_header("X-iXSystems-Reason", reason)
-                if license_data:
-                    req.add_header("X-iXSystems-License", license_data)
-
-                # Hack for debugging
-                req.add_header("User-Agent", "%s=%s" % (AVATAR_VERSION, current_version))
-                # Allow restarting
+        try:
+            if pathname:
                 if intr_ok:
-                    req.add_header("Range", "bytes=%d-" % read)
+                    try:
+                        retval = open(pathname, "r+b")
+                        read = os.fstat(retval.fileno()).st_size
+                        retval.seek(read)
+                    except:
+                        pass
+                if retval is None:
+                    retval = open(pathname, "w+b")
+            else:
+                retval = tempfile.TemporaryFile(dir=self._temp)
 
-                furl = opener.open(req, timeout=30)
-            except HTTPError as error:
-                if error.code == HTTP_RANGE:
-                    # We've reached the end of the file already
-                    # Can I get this incorrectly from any other server?
-                    # Do I need to do something different for the progress handler?
-                    retval.seek(0)
-                    return retval
-                log.error("Got http error %s" % str(error))
-                url_exc = error
-            except BaseException as e:
-                log.error("Unable to load %s: %s", url, str(e))
-                url_exc = e
+            if read > 0:
+                log.debug("File already exists, using a starting size of %d" % read)
 
-            if furl:
-                break
+            furl = None
+            for url in file_url:
+                url_exc = None
+                try:
+                    https_handler = VerifiedHTTPSHandler(ca_certs=DEFAULT_CA_FILE)
+                    opener = build_opener(https_handler)
+                    req = Request(url)
+                    req.add_header("X-iXSystems-Project", Avatar())
+                    req.add_header("X-iXSystems-Version", current_version)
+                    if host_id:
+                        req.add_header("X-iXSystems-HostID", host_id)
+                    if reason:
+                        req.add_header("X-iXSystems-Reason", reason)
+                    if license_data:
+                        req.add_header("X-iXSystems-License", license_data)
 
-        # The loop above should leave url_exc set to None if the file
-        # was grabbed.
-        if url_exc:
-            if furl:
-                furl.close()
-                furl = None
-            if retval:
-                retval.close()
-            log.error("Unable to load %s: %s", file_url, str(url_exc))
-            raise url_exc
+                    # Hack for debugging
+                    req.add_header("User-Agent", "%s=%s" % (AVATAR_VERSION, current_version))
+                    # Allow restarting
+                    if intr_ok:
+                        req.add_header("Range", "bytes=%d-" % read)
 
-        # This _shouldn't_ be doable, but I'm checking just in case.
-        if furl is None:
-            log.error("Unable to load %s", file_url)
-            if retval:
-                retval.close()
-            return None
-        
-        try:
-            totalsize = int(furl.info().get('Content-Length').strip())
-        except:
-            totalsize = None
+                    furl = opener.open(req, timeout=30)
+                except HTTPError as error:
+                    if error.code == HTTP_RANGE:
+                        # We've reached the end of the file already
+                        # Can I get this incorrectly from any other server?
+                        # Do I need to do something different for the progress handler?
+                        retval.seek(0)
+                        return retval
+                    log.error("Got http error %s" % str(error))
+                    url_exc = error
+                except BaseException as e:
+                    log.error("Unable to load %s: %s", url, str(e))
+                    url_exc = e
 
-        chunk_size = 64 * 1024
-        mbyte = 1024 * 1024
-        lastpercent = percent = 0
-        lasttime = time.time()
-        try:
-            while True:
-                data = furl.read(chunk_size)
-                tmptime = time.time()
-                if tmptime - lasttime > 0:
-                    downrate = int(chunk_size / (tmptime - lasttime))
-                else:
-                    downrate = chunk_size
-                lasttime = tmptime
-                if not data:
-                    log.debug("TryGetNetworkFile(%s):  Read %d bytes total" % (file_url, read))
+                if furl:
                     break
-                read += len(data)
-                if ((read % mbyte) == 0):
-                    log.debug("TryGetNetworkFile(%s):  Read %d bytes" % (file_url, read))
 
-                if handler and totalsize:
-                    percent = int((float(read) / float(totalsize)) * 100.0)
-                    if percent != lastpercent:
-                        handler(
-                            'network',
-                            url,
-                            size=totalsize,
-                            progress=percent,
-                            download_rate=downrate,
-                        )
-                    lastpercent = percent
-                retval.write(data)
-        except Exception as e:
-            log.debug("Got exception %s" % str(e), exc_info=True)
-            if intr_ok is False and pathname:
-                os.unlink(pathname)
-            raise e
-        retval.seek(0)
+            # The loop above should leave url_exc set to None if the file
+            # was grabbed.
+            if url_exc:
+                if furl:
+                    furl.close()
+                    furl = None
+                if retval:
+                    retval.close()
+                log.error("Unable to load %s: %s", file_url, str(url_exc))
+                raise url_exc
+
+            # This _shouldn't_ be doable, but I'm checking just in case.
+            if furl is None:
+                log.error("Unable to load %s", file_url)
+                if retval:
+                    retval.close()
+                return None
+
+            try:
+                totalsize = int(furl.info().get('Content-Length').strip())
+            except:
+                totalsize = None
+
+            chunk_size = 64 * 1024
+            mbyte = 1024 * 1024
+            lastpercent = percent = 0
+            lasttime = time.time()
+            try:
+                while True:
+                    data = furl.read(chunk_size)
+                    tmptime = time.time()
+                    if tmptime - lasttime > 0:
+                        downrate = int(chunk_size / (tmptime - lasttime))
+                    else:
+                        downrate = chunk_size
+                    lasttime = tmptime
+                    if not data:
+                        log.debug("TryGetNetworkFile(%s):  Read %d bytes total" % (file_url, read))
+                        break
+                    read += len(data)
+                    if ((read % mbyte) == 0):
+                        log.debug("TryGetNetworkFile(%s):  Read %d bytes" % (file_url, read))
+
+                    if handler and totalsize:
+                        percent = int((float(read) / float(totalsize)) * 100.0)
+                        if percent != lastpercent:
+                            handler(
+                                'network',
+                                url,
+                                size=totalsize,
+                                progress=percent,
+                                download_rate=downrate,
+                            )
+                        lastpercent = percent
+                    retval.write(data)
+            except Exception as e:
+                log.debug("Got exception %s" % str(e), exc_info=True)
+                if intr_ok is False and pathname:
+                    os.unlink(pathname)
+                raise e
+            retval.seek(0)
+        except:
+            if retval:
+                retval.close()
+            raise
         return retval
 
     # Load the list of currently-watched trains.

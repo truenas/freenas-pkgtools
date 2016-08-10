@@ -911,141 +911,147 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
     cache_mani = Manifest.Manifest(require_signature=True)
     mani_file = None
     try:
-        mani_file = VerifyUpdate(directory)
-        if mani_file:
-            cache_mani.LoadFile(mani_file)
-            if cache_mani.Sequence() == latest_mani.Sequence():
-                # Woohoo!
+        try:
+            mani_file = VerifyUpdate(directory)
+            if mani_file:
+                cache_mani.LoadFile(mani_file)
+                if cache_mani.Sequence() == latest_mani.Sequence():
+                    # Woohoo!
+                    mani_file.close()
+                    log.debug("DownloadUpdate:  Cache directory has latest manifest")
+                    return True
+                # Not the latest
                 mani_file.close()
-                log.debug("DownloadUpdate:  Cache directory has latest manifest")
-                return True
-            # Not the latest
-            mani_file.close()
-        mani_file = None
-    except UpdateBusyCacheException:
-        msg = "Cache directory %s is busy, so no update available" % directory
-        log.debug(msg)
-        raise UpdateBusyCacheException(msg)
-    except UpdateIncompleteCacheException:
-        log.debug("Incomplete cache directory, will try continuing")
-        # Hm, this is wrong.  I need to load the manifest file somehow
-    except (UpdateInvalidCacheException, ManifestInvalidSignature) as e:
-        # It's incomplete, so we need to remove it
-        log.error("DownloadUpdate(%s, %s):  Got exception %s; removing cache" % (train, directory, str(e)))
-        RemoveUpdate(directory)
-    except BaseException as e:
-        log.error("Got exception %s while trying to prepare update cache" % str(e))
-        raise e
-
-    # If we're dealing with an interrupted download, then the directory will
-    # exist, and there may be a MANIFEST file.  So let's try seeing if it
-    # does exist, and then compare.
-    log.debug("Going to try checking cached manifest %s" % os.path.join(directory, "MANIFEST"))
-    try:
-        mani_file = open(os.path.join(directory, "MANIFEST"), "r+b")
-        try:
-            fcntl.lockf(mani_file, fcntl.LOCK_EX | fcntl.LOCK_NB, 0, 0)
-        except (IOError, Exception) as e:
-            msg = "Unable to lock manifest file: %s" % str(e)
-            log.debug(msg)
-            mani_file.close()
-            raise UpdateBusyCacheException(msg)
-
-        temporary_manifest = Manifest.Manifest(require_signature=True)
-        log.debug("Going to try loading manifest file now")
-        temporary_manifest.LoadFile(mani_file)
-        log.debug("Loaded manifest file")
-        log.debug("Cached manifest file has sequence %s, latest_manfest has sequence %s" % (temporary_manifest.Sequence(), latest_mani.Sequence()))
-        if temporary_manifest.Sequence() != latest_mani.Sequence():
-            mani_file.close()
-            log.debug("Cached sequence is not the latest, so removing")
-            RemoveUpdate(directory)
             mani_file = None
-    except BaseException as e:
-        # This could just be that the file doesn't exist, so we don't pass on the exception
-        mani_file = None
-        log.debug("Got this exception: %s" % str(e))
-
-    if mani_file is None:
-        try:
-            os.makedirs(directory)
+        except UpdateBusyCacheException:
+            msg = "Cache directory %s is busy, so no update available" % directory
+            log.debug(msg)
+            raise UpdateBusyCacheException(msg)
+        except UpdateIncompleteCacheException:
+            log.debug("Incomplete cache directory, will try continuing")
+            # Hm, this is wrong.  I need to load the manifest file somehow
+        except (UpdateInvalidCacheException, ManifestInvalidSignature) as e:
+            # It's incomplete, so we need to remove it
+            log.error("DownloadUpdate(%s, %s):  Got exception %s; removing cache" % (train, directory, str(e)))
+            RemoveUpdate(directory)
         except BaseException as e:
-            log.debug("Unable to create directory %s: %s" % (directory, str(e)))
-            log.debug("Hopefully the current cache is okay")
-
-        try:
-            mani_file = open(directory + "/MANIFEST", "w+b")
-        except (IOError, Exception) as e:
-            log.error("Unale to create manifest file in directory %s" % (directory, str(e)))
+            log.error("Got exception %s while trying to prepare update cache" % str(e))
             raise e
 
+        # If we're dealing with an interrupted download, then the directory will
+        # exist, and there may be a MANIFEST file.  So let's try seeing if it
+        # does exist, and then compare.
+        log.debug("Going to try checking cached manifest %s" % os.path.join(directory, "MANIFEST"))
         try:
-            fcntl.lockf(mani_file, fcntl.LOCK_EX | fcntl.LOCK_NB, 0, 0)
-        except (IOError, Exception) as e:
-            msg = "Unable to lock manifest file: %s" % str(e)
-            log.debug(msg)
-            mani_file.close()
-            raise UpdateBusyCacheException(msg)
-        # Store the latest manifest.
-        latest_mani.StoreFile(mani_file)
-        mani_file.flush()
+            mani_file = open(os.path.join(directory, "MANIFEST"), "r+b")
+            try:
+                fcntl.lockf(mani_file, fcntl.LOCK_EX | fcntl.LOCK_NB, 0, 0)
+            except (IOError, Exception) as e:
+                msg = "Unable to lock manifest file: %s" % str(e)
+                log.debug(msg)
+                mani_file.close()
+                raise UpdateBusyCacheException(msg)
 
-    # Run the update validation, if any.
-    # Note that this downloads the file if it's not already there.
-    latest_mani.RunValidationProgram(directory, kind=Manifest.VALIDATE_UPDATE)
+            temporary_manifest = Manifest.Manifest(require_signature=True)
+            log.debug("Going to try loading manifest file now")
+            temporary_manifest.LoadFile(mani_file)
+            log.debug("Loaded manifest file")
+            log.debug("Cached manifest file has sequence %s, latest_manfest has sequence %s" % (temporary_manifest.Sequence(), latest_mani.Sequence()))
+            if temporary_manifest.Sequence() != latest_mani.Sequence():
+                mani_file.close()
+                log.debug("Cached sequence is not the latest, so removing")
+                RemoveUpdate(directory)
+                mani_file = None
+        except BaseException as e:
+            # This could just be that the file doesn't exist, so we don't pass on the exception
+            mani_file = None
+            log.debug("Got this exception: %s" % str(e))
 
-    # Find out what differences there are
-    diffs = Manifest.DiffManifests(mani, latest_mani)
-    if diffs is None or len(diffs) == 0:
-        log.debug("DownloadUpdate:  No update available")
-        # Remove the cache directory and empty manifest file
-        RemoveUpdate(directory)
-        mani_file.close()
-        return False
-    log.debug("DownloadUpdate:  diffs = %s" % diffs)
+        if mani_file is None:
+            try:
+                os.makedirs(directory)
+            except BaseException as e:
+                log.debug("Unable to create directory %s: %s" % (directory, str(e)))
+                log.debug("Hopefully the current cache is okay")
 
-    download_packages = []
-    reboot_required = True
-    if "Reboot" in diffs:
-        reboot_required = diffs["Reboot"]
+            try:
+                mani_file = open(directory + "/MANIFEST", "w+b")
+            except (IOError, Exception) as e:
+                log.error("Unale to create manifest file in directory %s" % (directory, str(e)))
+                raise e
 
-    if "Packages" in diffs:
-        for pkg, op, old in diffs["Packages"]:
-            if op == "delete":
-                continue
-            log.debug("DownloadUpdate:  Will %s package %s" % (op, pkg.Name()))
-            download_packages.append(pkg)
+            try:
+                fcntl.lockf(mani_file, fcntl.LOCK_EX | fcntl.LOCK_NB, 0, 0)
+            except (IOError, Exception) as e:
+                msg = "Unable to lock manifest file: %s" % str(e)
+                log.debug(msg)
+                mani_file.close()
+                raise UpdateBusyCacheException(msg)
+            # Store the latest manifest.
+            latest_mani.StoreFile(mani_file)
+            mani_file.flush()
 
-    log.debug("Update does%s seem to require a reboot" % "" if reboot_required else " not")
+        # Run the update validation, if any.
+        # Note that this downloads the file if it's not already there.
+        latest_mani.RunValidationProgram(directory, kind=Manifest.VALIDATE_UPDATE)
 
-    # Next steps:  download the package files.
-    for indx, pkg in enumerate(download_packages):
-        # This is where we find out for real if a reboot is required.
-        # To do that, we may need to know which update was downloaded.
-        if check_handler:
-            check_handler(indx + 1, pkg=pkg, pkgList=download_packages)
-        pkg_file = conf.FindPackageFile(pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type)
-        if pkg_file is None:
-            log.error("Could not download package file for %s" % pkg.Name())
+        # Find out what differences there are
+        diffs = Manifest.DiffManifests(mani, latest_mani)
+        if diffs is None or len(diffs) == 0:
+            log.debug("DownloadUpdate:  No update available")
+            # Remove the cache directory and empty manifest file
             RemoveUpdate(directory)
+            mani_file.close()
             return False
-        else:
-            pkg_file.close()
-            
-    # Almost done:  get a changelog if one exists for the train
-    # If we can't get it, we don't care.
-    with conf.GetChangeLog(train, save_dir=directory, handler=get_handler):
-        pass
-    # Then save the manifest file.
-    # Create the SEQUENCE file.
-    with open(directory + "/SEQUENCE", "w") as f:
-        f.write("%s" % conf.SystemManifest().Sequence())
-    # And create the SERVER file.
-    with open(directory + "/SERVER", "w") as f:
-        f.write("%s" % conf.UpdateServerName())
+        log.debug("DownloadUpdate:  diffs = %s" % diffs)
 
-    # Then return True!
-    mani_file.close()
+        download_packages = []
+        reboot_required = True
+        if "Reboot" in diffs:
+            reboot_required = diffs["Reboot"]
+
+        if "Packages" in diffs:
+            for pkg, op, old in diffs["Packages"]:
+                if op == "delete":
+                    continue
+                log.debug("DownloadUpdate:  Will %s package %s" % (op, pkg.Name()))
+                download_packages.append(pkg)
+
+        log.debug("Update does%s seem to require a reboot" % "" if reboot_required else " not")
+
+        # Next steps:  download the package files.
+        for indx, pkg in enumerate(download_packages):
+            # This is where we find out for real if a reboot is required.
+            # To do that, we may need to know which update was downloaded.
+            if check_handler:
+                check_handler(indx + 1, pkg=pkg, pkgList=download_packages)
+            pkg_file = conf.FindPackageFile(
+                pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type
+            )
+            if pkg_file is None:
+                log.error("Could not download package file for %s" % pkg.Name())
+                RemoveUpdate(directory)
+                return False
+            else:
+                pkg_file.close()
+
+        # Almost done:  get a changelog if one exists for the train
+        # If we can't get it, we don't care.
+        with conf.GetChangeLog(train, save_dir=directory, handler=get_handler):
+            pass
+        # Then save the manifest file.
+        # Create the SEQUENCE file.
+        with open(directory + "/SEQUENCE", "w") as f:
+            f.write("%s" % conf.SystemManifest().Sequence())
+        # And create the SERVER file.
+        with open(directory + "/SERVER", "w") as f:
+            f.write("%s" % conf.UpdateServerName())
+
+    finally:
+        if mani_file:
+            mani_file.close()
+
+    # if no error has been raised so far Then return True!
     return True
 
 
