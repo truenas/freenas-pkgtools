@@ -308,8 +308,8 @@ def RunPkgScript(scripts, type, root=None, **kwargs):
     if "SCRIPT_ARG" in kwargs and kwargs["SCRIPT_ARG"] is not None:
         args.append(kwargs["SCRIPT_ARG"])
 
-    print("script (chroot to %s):  %s\n-----------" % ("/" if root is None else root, args))
-    print("%s\n--------------" % scripts[type])
+    log.debug("script (chroot to %s):  %s\n-----------" % ("/" if root is None else root, args))
+    log.debug("%s\n--------------" % scripts[type])
     if os.geteuid() != 0 and root is not None:
         log.error(
             "Installation root is set, and process is not root.  Cannot run script %s" % type
@@ -698,7 +698,7 @@ def install_file(pkgfile, dest):
     if PKG_DIRS_KEY in mjson:
         mdirs.update(mjson[PKG_DIRS_KEY])
 
-    print("%s-%s" % (pkgName, pkgVersion))
+    log.debug("%s-%s" % (pkgName, pkgVersion))
     if debug > 1:
         log.debug("installation target = %s" % dest)
 
@@ -722,7 +722,7 @@ def install_file(pkgfile, dest):
                   (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA in pkgScripts)) and \
                  pkgDeltaVersion is not None)
 
-        print("upgrade_aware = %s" % upgrade_aware)
+        log.debug("upgrade_aware = %s" % upgrade_aware)
         # First thing we do, if we're upgrade-aware, is to run the
         # upgrade scripts from the old version.
         if upgrade_aware:
