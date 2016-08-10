@@ -2,26 +2,29 @@
 # Create a pkgng-like package from a directory.
 from __future__ import print_function
 
-import os, sys, stat, re
+import os
+import sys
+import re
 import json
 import tarfile
 import getopt
 import hashlib
 import io
+import fnmatch
 if sys.version_info[0] == 2:
     import ConfigParser as configparser
 else:
     import configparser
-import subprocess
-import tempfile
+
 
 debug = 0
 verbose = False
-#
+
+
 # Scan a directory hierarchy, creating a
 # "files" and "directories" set of dictionaries.
 # Regular files get sha256 checksums.
-def ScanTree(root, filter_func = None):
+def ScanTree(root, filter_func=None):
     global debug, verbose
     flat_size = 0
     # This is a list of files we've seen, by <st_dev, st_ino> keys.
@@ -47,13 +50,15 @@ def ScanTree(root, filter_func = None):
                 if filter_func(prefix+f) == True:
                     continue
             full_path = start + "/" + f
-            if verbose or debug > 0: print("looking at %s" % full_path, file=sys.stderr)
+            if verbose or debug > 0:
+                print("looking at %s" % full_path, file=sys.stderr)
             st = os.lstat(full_path)
             size = None
             if os.path.islink(full_path):
                 buf = os.readlink(full_path)
                 size = len(buf)
-                if buf.startswith("/"): buf = buf[1:]
+                if buf.startswith("/"):
+                    buf = buf[1:]
                 file_list[prefix + f] = hashlib.sha256(buf.encode('utf8')).hexdigest()
             elif os.path.isfile(full_path):
                 size = st.st_size
@@ -64,7 +69,11 @@ def ScanTree(root, filter_func = None):
                 flat_size += size
                 seen_files[st.st_dev, st.st_ino] = True
 
-    return { "files" : file_list, "directories" : directory_list, "flatsize" : flat_size }
+    return {
+        "files": file_list,
+        "directories": directory_list,
+        "flatsize": flat_size
+    }
 
 
 #
@@ -88,6 +97,7 @@ SCRIPTS = [
     "upgrade"
 ]
 
+
 def ProcessFileList(files, cfg_file):
     cfg_dir = os.path.dirname(cfg_file)
     for f in files:
@@ -107,11 +117,12 @@ def ProcessFileList(files, cfg_file):
                     yield i
 
                 flist.close()
-            else:
-                if debug: print("Unknown directive: %s" % (command,), file=sys.stderr)
+            elif debug:
+                print("Unknown directive: %s" % (command,), file=sys.stderr)
 
-        else:
-            if debug: print("Malformed @directive: %s" % (f,), file=sys.stderr)
+        elif debug:
+            print("Malformed @directive: %s" % (f,), file=sys.stderr)
+
 
 def TemplateFiles(path):
     """
@@ -152,6 +163,7 @@ def TemplateFiles(path):
     rv["include"] = list(ProcessFileList(includes, cfg_file))
     rv["exclude"] = list(ProcessFileList(excludes, cfg_file))
     return rv
+
 
 def LoadTemplate(path):
     """
@@ -196,7 +208,7 @@ def LoadTemplate(path):
         for key in ["requires-reboot"]:
             if cfp.has_option("Package", key):
                 rv[key] = cfp.getboolean("Package", key)
-                
+
     if cfp.has_section("Scripts"):
         if "scripts" not in rv:
             rv["scripts"] = {}
@@ -229,31 +241,32 @@ def LoadTemplate(path):
                         restart_list[svc] = True
                 else:
                     for svc in cfp.get("Services", "restart").split(","):
-                        if not svc in service_list:
+                        if svc not in service_list:
                             print("Restart service %s not in service list" % svc, file=sys.stderr)
                         else:
                             restart_list[svc] = True
-            sdict = { "Services" : service_list }
+            sdict = {"Services": service_list}
             if len(restart_list) > 0:
                 sdict["Restart"] = restart_list
             rv["ix-package-services"] = sdict
     return rv
+
 
 def main():
     global debug, verbose
     # Some valid, but stupid, defaults.
     # "arch" isn't used by the freenas package system
     manifest = {
-        "www" : "http://www.freenas.org",
-        "arch" : "freebsd:10:x86:64",
-        "maintainer" : "something@freenas.org",
-        "comment" : "FreeNAS Package",
-        "origin" : "freenas/os",
-        "prefix" : "/",
-        "licenselogic" : "single",
-        "desc" : "FreeNAS Package",
-        "requires-reboot" : True,
-        }
+        "www": "http://www.freenas.org",
+        "arch": "freebsd:10:x86:64",
+        "maintainer": "something@freenas.org",
+        "comment": "FreeNAS Package",
+        "origin": "freenas/os",
+        "prefix": "/",
+        "licenselogic": "single",
+        "desc": "FreeNAS Package",
+        "requires-reboot": True,
+    }
     root = None
     arg_name = None
     arg_version = None
@@ -302,12 +315,13 @@ def main():
         print("manifest = %s" % manifest, file=sys.stderr)
         filters = TemplateFiles(arg_template)
         if filters is not None:
-            if debug > 1:  print("Filter list = %s" % filters, file=sys.stderr)
+            if debug > 1:
+                print("Filter list = %s" % filters, file=sys.stderr)
             if len(filters["include"]) > 0:
                 include_list = filters["include"]
             if len(filters["exclude"]) > 0:
                 exclude_list = filters["exclude"]
-            
+
     def FilterFunc(path):
         """
         Return a boolean indicating whether the path in question
@@ -337,8 +351,6 @@ def main():
 
         # Yes, I know, a nested function in a nested function.
         def matches(path, pattern):
-            import fnmatch
-
             prefix = ""
             if path.startswith("./"):
                 prefix = "."
@@ -348,12 +360,13 @@ def main():
                 tmp = pattern
             # First, check to see if the name simply matches
             if path == tmp:
-                if debug: print("Match: %s" % path, file=sys.stderr)
+                if debug:
+                    print("Match: %s" % path, file=sys.stderr)
                 return True
             # Next, check to see if elem is a subset of it
-            if path.startswith(tmp) and \
-               path[len(tmp)] == "/":
-                if debug: print("Match %s as child of %s" % (path, tmp), file=sys.stderr)
+            if path.startswith(tmp) and path[len(tmp)] == "/":
+                if debug:
+                    print("Match %s as child of %s" % (path, tmp), file=sys.stderr)
                 return True
             # Now to start using globbing.
             # fnmatch is awful, but let's try just that
@@ -361,7 +374,8 @@ def main():
             # Thus, "/usr/*.cfg" matches both "/usr/foo.cfg" and
             # "/usr/local/etc/django.cfg".)
             if fnmatch.fnmatch(path, elem):
-                if debug: print("Match: %s as glob match for %s" % (path, tmp), file=sys.stderr)
+                if debug:
+                    print("Match: %s as glob match for %s" % (path, tmp), file=sys.stderr)
                 return True
             return False
 
@@ -393,23 +407,26 @@ def main():
         print("Package must have a version", file=sys.stderr)
         usage()
 
-    if debug > 2: print(manifest, file=sys.stderr)
+    if debug > 2:
+        print(manifest, file=sys.stderr)
 
     # Now start scanning.
     t = ScanTree(root, FilterFunc)
     manifest["files"] = t["files"]
     manifest["directories"] = t["directories"]
     manifest["flatsize"] = t["flatsize"]
-    manifest_string = json.dumps(manifest, sort_keys=True,
-                                 indent=4, separators=(',', ': '))
-    if debug > 1: print(manifest_string)
+    manifest_string = json.dumps(
+        manifest, sort_keys=True, indent=4, separators=(',', ': ')
+    )
+    if debug > 1:
+        print(manifest_string)
 
     # I would LOVE to be able to use xz, but python's tarfile does not
     # (as of when I write this) support it.  Python 3 has it.
-    tf = tarfile.open(output, "w:gz", format = tarfile.PAX_FORMAT)
+    tf = tarfile.open(output, "w:gz", format=tarfile.PAX_FORMAT)
 
     # Add the manifest string as the file "+MANIFEST"
-    mani_file_info = tarfile.TarInfo(name = "+MANIFEST")
+    mani_file_info = tarfile.TarInfo(name="+MANIFEST")
     mani_file_info.size = len(manifest_string)
     mani_file_info.mode = 0o600
     mani_file_info.type = tarfile.REGTYPE
@@ -417,12 +434,14 @@ def main():
     tf.addfile(mani_file_info, mani_file)
     # Now add all of the files
     for file in sorted(manifest["files"]):
-        if verbose or debug > 0:  print("Adding file %s to archive" % file, file=sys.stderr)
-        tf.add(root + file, arcname = file, recursive = False)
+        if verbose or debug > 0:
+            print("Adding file %s to archive" % file, file=sys.stderr)
+        tf.add(root + file, arcname=file, recursive=False)
     # And now the directories
     for dir in sorted(manifest["directories"]):
-        if verbose or debug > 0:  print("Adding directory %s to archive" % dir, file=sys.stderr)
-        tf.add(root + dir, arcname = dir, recursive = False)
+        if verbose or debug > 0:
+            print("Adding directory %s to archive" % dir, file=sys.stderr)
+        tf.add(root + dir, arcname=dir, recursive=False)
 
     tf.close()
 

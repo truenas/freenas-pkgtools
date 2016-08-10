@@ -252,7 +252,7 @@ def GetTarMeta(ti):
         "schg": stat.SF_IMMUTABLE,
         "sunlnk": stat.SF_NOUNLINK,
         "uchg": stat.UF_IMMUTABLE,
-        }
+    }
     rv = {}
     rv[TAR_UID_KEY] = ti.uid
     rv[TAR_GID_KEY] = ti.gid
@@ -712,15 +712,25 @@ def install_file(pkgfile, dest):
 
         # pkgScripts is never None, but it may be empty
         if old_scripts is not None:
-            upgrade_aware = ((PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE in old_scripts) or \
-                            (PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE in old_scripts) or \
-                            (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE in old_scripts)) and \
-                ((PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE in pkgScripts) or \
-                 (PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE in pkgScripts) or \
-                 (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE in pkgScripts)) or \
-                (((PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA in pkgScripts) or \
-                  (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA in pkgScripts)) and \
-                 pkgDeltaVersion is not None)
+            upgrade_aware = (
+                (
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE in old_scripts) or
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE in old_scripts) or
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE in old_scripts)
+                ) and
+                (
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE in pkgScripts) or
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE in pkgScripts) or
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE in pkgScripts)
+                ) or
+                (
+                    (
+                        (PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA in pkgScripts) or
+                        (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA in pkgScripts)
+                    ) and
+                    pkgDeltaVersion is not None
+                )
+            )
 
         log.debug("upgrade_aware = %s" % upgrade_aware)
         # First thing we do, if we're upgrade-aware, is to run the
@@ -873,7 +883,7 @@ def install_file(pkgfile, dest):
         member = t.next()
 
     t.close()
-    
+
     if len(pkgFiles) > 0:
         pkgdb.AddFilesBulk(pkgFiles)
 
@@ -934,7 +944,7 @@ class Installer(object):
                     if pkgfile:
                         pkgfile.close()
             self._packages = []
-            
+
     def SetDebug(self, level):
         global debug
         debug = level
