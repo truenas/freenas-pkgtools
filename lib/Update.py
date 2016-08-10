@@ -1202,7 +1202,7 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False):
     changes.pop("Reboot")
     if len(changes) == 0:
         # This shouldn't happen
-        log.debug("ApplyUupdate:  changes only has Reboot key")
+        log.debug("ApplyUpdate: changes only has Reboot key")
         return None
 
     service_list = None

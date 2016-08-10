@@ -8,7 +8,6 @@ import tarfile
 import hashlib
 import logging
 import tempfile
-import stat
 
 debug = 0
 verbose = False
