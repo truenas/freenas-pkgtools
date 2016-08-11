@@ -56,7 +56,7 @@ def modified_call(popenargs, logger, **kwargs):
     stderr_log_level = kwargs.get('stderr_log_level', logging.ERROR)
     env = kwargs.get('env')
     proc = subprocess.Popen(
-        popenargs, preexec_fn=preexec_fn, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        popenargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=preexec_fn, env=env
     )
 
     try:

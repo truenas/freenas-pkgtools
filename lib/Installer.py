@@ -306,7 +306,7 @@ def RunPkgScript(scripts, type, root=None, **kwargs):
 
     with open(scriptPath, "w") as f:
         f.write(scripts[type])
-    args = ["sh", "-x", scriptName]
+    args = ["/bin/sh", "-x", scriptName]
     if "SCRIPT_ARG" in kwargs and kwargs["SCRIPT_ARG"] is not None:
         args.append(kwargs["SCRIPT_ARG"])
 
@@ -325,7 +325,7 @@ def RunPkgScript(scripts, type, root=None, **kwargs):
         script_env = os.environ.copy()
         if "PKG_PREFIX" in kwargs and kwargs["PKG_PREFIX"] is not None:
                 script_env["PKG_PREFIX"] = kwargs["PKG_PREFIX"]
-        status = modified_call(["/bin/sh", args], log, preexec_fn=prefunc, env=script_env)
+        status = modified_call(args, log, preexec_fn=prefunc, env=script_env)
         if status != 0:
             # Should I raise an exception?
             log.error("Sub procss exited with status %#x" % status)
