@@ -9,6 +9,7 @@ import sys
 import random
 import shutil
 import fcntl
+import select
 try:
     import libzfs
 except ImportError:
@@ -244,6 +245,41 @@ def _grub_snapshot(name):
     return "{0}/grub@Pre-Upgrade-{1}".format(freenas_pool, name)
 
 
+def modified_call(popenargs, stdout_log_level=logging.DEBUG, stderr_log_level=logging.ERROR):
+    """
+    Variant of subprocess.call that accepts a logger instead of stdout/stderr,
+    and logs stdout messages via logger.debug and stderr messages via
+    logger.error.
+
+    Original code taken from: https://gist.github.com/hangtwenty/6390750 and modified
+    """
+    proc = subprocess.Popen(popenargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    try:
+        log_level = {
+            proc.stdout: stdout_log_level,
+            proc.stderr: stderr_log_level
+        }
+
+        def check_io():
+            ready_to_read = select.select([proc.stdout, proc.stderr], [], [], 1000)[0]
+            for io in ready_to_read:
+                text = io.read().decode('utf8')
+                for i in filter(lambda x: x and not x.isspace(), text.split('\n')):
+                    log.log(log_level[io], i)
+
+        # keep checking stdout/stderr until the proc exits
+        while proc.poll() is None:
+            check_io()
+
+        check_io()  # check again to catch anything after the process exits
+
+        return proc.wait()
+    finally:
+        proc.stdout.close()
+        proc.stderr.close()
+
+
 def RunCommand(command, args):
     # Run the given command.  Uses subprocess module.
     # Returns True if the command exited with 0, or
@@ -264,7 +300,7 @@ def RunCommand(command, args):
         pomask = ctypes.pointer(omask)
         libc.sigprocmask(signal.SIGQUIT, pmask, pomask)
         try:
-            child = subprocess.call(proc_args)
+            child = modified_call(proc_args)
         except:
             return False
         libc.sigprocmask(signal.SIGQUIT, pomask, None)
