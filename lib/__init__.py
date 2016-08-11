@@ -43,6 +43,31 @@ def Avatar():
     return _os_type
 
 
+# Note: logger.hasHandlers was added in python 3.2 so backporting
+# this function here so that python2.7 can also use it.
+def hasHandlers(logger):
+    """
+    See if this logger has any handlers configured.
+
+    Loop through all handlers for this logger and its parents in the
+    logger hierarchy. Return True if a handler was found, else False.
+    Stop searching up the hierarchy whenever a logger with the "propagate"
+    attribute set to zero is found - that will be the last logger which
+    is checked for the existence of handlers.
+    """
+    c = logger
+    rv = False
+    while c:
+        if c.handlers:
+            rv = True
+            break
+        if not c.propagate:
+            break
+        else:
+            c = c.parent
+    return rv
+
+
 def modified_call(popenargs, logger, **kwargs):
     """
     Variant of subprocess.call that accepts a logger instead of stdout/stderr,
@@ -169,7 +194,7 @@ log_config_dict = {
     }
 }
 
-if not test_logger.hasHandlers():
+if not hasHandlers(test_logger):
     log_config_dict['loggers'] = {
         '': {
             'handlers': ['syslog'],
