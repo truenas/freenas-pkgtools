@@ -8,6 +8,8 @@ import tarfile
 import hashlib
 import logging
 import tempfile
+import subprocess
+from . import modified_call
 
 debug = 0
 verbose = False
@@ -317,25 +319,16 @@ def RunPkgScript(scripts, type, root=None, **kwargs):
         if debug < 4:
             return
     else:
-        pid = os.fork()
-        if pid == 0:
-            # Child
+        def prefunc():
             if root:
                 os.chroot(root)
-            if "PKG_PREFIX" in kwargs and kwargs["PKG_PREFIX"] is not None:
-                os.environ["PKG_PREFIX"] = kwargs["PKG_PREFIX"]
-            os.execv("/bin/sh", args)
-            sys.exit(1)
-        elif pid != -1:
-            # Parent
-            (tpid, status) = os.wait()
-            if tpid != pid:
-                log.error("What?  I waited for process %d and I got %d instead!" % (pid, tpid))
-            if status != 0:
-                # Should I raise an exception?
-                log.error("Sub procss exited with status %#x" % status)
-        else:
-            log.error("Huh?  Got -1 from os.fork and no exception?")
+        script_env = os.environ.copy()
+        if "PKG_PREFIX" in kwargs and kwargs["PKG_PREFIX"] is not None:
+                script_env["PKG_PREFIX"] = kwargs["PKG_PREFIX"]
+        status = modified_call(["/bin/sh", args], log, preexec_fn=prefunc, env=script_env)
+        if status != 0:
+            # Should I raise an exception?
+            log.error("Sub procss exited with status %#x" % status)
 
     os.unlink(scriptPath)
 
