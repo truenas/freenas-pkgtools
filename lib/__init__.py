@@ -3,6 +3,8 @@ import logging.config
 import math
 import syslog
 import sys
+import select
+import subprocess
 
 # To use this:
 # from . import Avatar
@@ -39,6 +41,47 @@ except:
 
 def Avatar():
     return _os_type
+
+
+def modified_call(popenargs, logger, **kwargs):
+    """
+    Variant of subprocess.call that accepts a logger instead of stdout/stderr,
+    and logs stdout messages via logger.debug and stderr messages via
+    logger.error.
+
+    Original code taken from: https://gist.github.com/hangtwenty/6390750 and modified
+    """
+    preexec_fn = kwargs.get('preexec_fn')
+    stdout_log_level = kwargs.get('stdout_log_level', logging.DEBUG)
+    stderr_log_level = kwargs.get('stderr_log_level', logging.ERROR)
+    env = kwargs.get('env')
+    proc = subprocess.Popen(
+        popenargs, preexec_fn=preexec_fn, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+
+    try:
+        log_level = {
+            proc.stdout: stdout_log_level,
+            proc.stderr: stderr_log_level
+        }
+
+        def check_io():
+            ready_to_read = select.select([proc.stdout, proc.stderr], [], [], 1000)[0]
+            for io in ready_to_read:
+                text = io.read().decode('utf8')
+                for i in filter(lambda x: x and not x.isspace(), text.split('\n')):
+                    logger.log(log_level[io], i)
+
+        # keep checking stdout/stderr until the proc exits
+        while proc.poll() is None:
+            check_io()
+
+        check_io()  # check again to catch anything after the process exits
+
+        return proc.wait()
+    finally:
+        proc.stdout.close()
+        proc.stderr.close()
 
 
 class SysLogHandler(logging.Handler):
