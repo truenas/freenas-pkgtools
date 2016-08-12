@@ -8,7 +8,8 @@ import tarfile
 import hashlib
 import logging
 import tempfile
-import stat
+import subprocess
+from . import modified_call
 
 debug = 0
 verbose = False
@@ -253,7 +254,7 @@ def GetTarMeta(ti):
         "schg": stat.SF_IMMUTABLE,
         "sunlnk": stat.SF_NOUNLINK,
         "uchg": stat.UF_IMMUTABLE,
-        }
+    }
     rv = {}
     rv[TAR_UID_KEY] = ti.uid
     rv[TAR_GID_KEY] = ti.gid
@@ -305,12 +306,12 @@ def RunPkgScript(scripts, type, root=None, **kwargs):
 
     with open(scriptPath, "w") as f:
         f.write(scripts[type])
-    args = ["sh", "-x", scriptName]
+    args = ["/bin/sh", "-x", scriptName]
     if "SCRIPT_ARG" in kwargs and kwargs["SCRIPT_ARG"] is not None:
         args.append(kwargs["SCRIPT_ARG"])
 
-    print("script (chroot to %s):  %s\n-----------" % ("/" if root is None else root, args))
-    print("%s\n--------------" % scripts[type])
+    log.debug("script (chroot to %s):  %s\n-----------" % ("/" if root is None else root, args))
+    log.debug("%s\n--------------" % scripts[type])
     if os.geteuid() != 0 and root is not None:
         log.error(
             "Installation root is set, and process is not root.  Cannot run script %s" % type
@@ -318,25 +319,16 @@ def RunPkgScript(scripts, type, root=None, **kwargs):
         if debug < 4:
             return
     else:
-        pid = os.fork()
-        if pid == 0:
-            # Child
+        def prefunc():
             if root:
                 os.chroot(root)
-            if "PKG_PREFIX" in kwargs and kwargs["PKG_PREFIX"] is not None:
-                os.environ["PKG_PREFIX"] = kwargs["PKG_PREFIX"]
-            os.execv("/bin/sh", args)
-            sys.exit(1)
-        elif pid != -1:
-            # Parent
-            (tpid, status) = os.wait()
-            if tpid != pid:
-                log.error("What?  I waited for process %d and I got %d instead!" % (pid, tpid))
-            if status != 0:
-                # Should I raise an exception?
-                log.error("Sub procss exited with status %#x" % status)
-        else:
-            log.error("Huh?  Got -1 from os.fork and no exception?")
+        script_env = os.environ.copy()
+        if "PKG_PREFIX" in kwargs and kwargs["PKG_PREFIX"] is not None:
+                script_env["PKG_PREFIX"] = kwargs["PKG_PREFIX"]
+        status = modified_call(args, log, preexec_fn=prefunc, env=script_env)
+        if status != 0:
+            # Should I raise an exception?
+            log.error("Sub procss exited with status %#x" % status)
 
     os.unlink(scriptPath)
 
@@ -699,7 +691,7 @@ def install_file(pkgfile, dest):
     if PKG_DIRS_KEY in mjson:
         mdirs.update(mjson[PKG_DIRS_KEY])
 
-    print("%s-%s" % (pkgName, pkgVersion))
+    log.debug("%s-%s" % (pkgName, pkgVersion))
     if debug > 1:
         log.debug("installation target = %s" % dest)
 
@@ -713,17 +705,27 @@ def install_file(pkgfile, dest):
 
         # pkgScripts is never None, but it may be empty
         if old_scripts is not None:
-            upgrade_aware = ((PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE in old_scripts) or \
-                            (PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE in old_scripts) or \
-                            (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE in old_scripts)) and \
-                ((PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE in pkgScripts) or \
-                 (PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE in pkgScripts) or \
-                 (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE in pkgScripts)) or \
-                (((PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA in pkgScripts) or \
-                  (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA in pkgScripts)) and \
-                 pkgDeltaVersion is not None)
+            upgrade_aware = (
+                (
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE in old_scripts) or
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE in old_scripts) or
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE in old_scripts)
+                ) and
+                (
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE in pkgScripts) or
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE in pkgScripts) or
+                    (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE in pkgScripts)
+                ) or
+                (
+                    (
+                        (PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA in pkgScripts) or
+                        (PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA in pkgScripts)
+                    ) and
+                    pkgDeltaVersion is not None
+                )
+            )
 
-        print("upgrade_aware = %s" % upgrade_aware)
+        log.debug("upgrade_aware = %s" % upgrade_aware)
         # First thing we do, if we're upgrade-aware, is to run the
         # upgrade scripts from the old version.
         if upgrade_aware:
@@ -874,7 +876,7 @@ def install_file(pkgfile, dest):
         member = t.next()
 
     t.close()
-    
+
     if len(pkgFiles) > 0:
         pkgdb.AddFilesBulk(pkgFiles)
 
@@ -935,7 +937,7 @@ class Installer(object):
                     if pkgfile:
                         pkgfile.close()
             self._packages = []
-            
+
     def SetDebug(self, level):
         global debug
         debug = level
