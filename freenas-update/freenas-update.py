@@ -13,7 +13,7 @@ sys.path.append("/usr/local/lib")
 import freenasOS.Configuration as Configuration
 import freenasOS.Update as Update
 import freenasOS.Exceptions as Exceptions
-from freenasOS import log_to_stderr
+from freenasOS import log_to_handler
 
 
 class ProgressBar(object):
@@ -319,7 +319,7 @@ where cmd is one of:
             assert False, "unhandled option {0}".format(o)
 
     if verbose:
-        log_to_stderr()
+        log_to_handler('stderr')
     log = logging.getLogger('freenas-update')
 
     config = Configuration.Configuration()
