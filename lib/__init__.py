@@ -153,12 +153,15 @@ class SysLogHandler(logging.Handler):
 
 
 class StartsWithFilter(logging.Filter):
-    def __init__(self, params):
-        self.params = params
+    def __init__(self, **kwargs):
+        self.module = kwargs.get('module', '')
+        self.params = kwargs.get('params', [])
 
     def filter(self, record):
         if self.params:
-            allow = not any(record.msg.startswith(x) for x in self.params)
+            allow = not any(
+                record.name.startswith(self.module) and record.msg.startswith(x) for x in self.params
+            )
         else:
             allow = True
         return allow
@@ -173,17 +176,17 @@ log_config_dict = {
             'format': '[%(name)s:%(lineno)s] %(message)s',
         },
     },
-    'filters': {
-        'cleandownload': {
-            '()': StartsWithFilter,
-            'params': ['TryGetNetworkFile', 'Searching']
-        }
-    },
     'handlers': {
-        'std': {
+        'stderr': {
             'class': 'logging.StreamHandler',
             'level': 'DEBUG',
             'stream': 'ext://sys.stderr',
+            'formatter': 'simple'
+        },
+        'stdout': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG',
+            'stream': 'ext://sys.stdout',
             'formatter': 'simple'
         },
         'syslog': {
@@ -205,12 +208,27 @@ if not hasHandlers(test_logger):
 
 
 def disable_trygetfilelogs():
-    log_config_dict['handlers']['syslog']['filters'] = ['cleandownload']
-    logging.config.dictConfig(log_config_dict)
+    update_log_filter = StartsWithFilter(
+        module='freenasOS', params=['TryGetNetworkFile', 'Searching']
+    )
+    for handler in logging.root.handlers:
+        handler.addFilter(update_log_filter)
 
 
-def log_to_stderr():
-    log_config_dict['loggers']['']['handlers'] = ['std']
+def log_to_handler(specified_handler):
+    """
+    Switch freenasOS logging to either one of the following handlers:
+        1. 'stdout'
+        2. 'stderr'
+        3. 'syslog'
+    """
+    log_config_dict['loggers'] = {
+        '': {
+            'handlers': [specified_handler],
+            'level': 'DEBUG',
+            'propagate': True
+        }
+    }
     logging.config.dictConfig(log_config_dict)
 
 logging.config.dictConfig(log_config_dict)
