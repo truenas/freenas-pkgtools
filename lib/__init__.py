@@ -90,19 +90,20 @@ def modified_call(popenargs, logger, **kwargs):
             proc.stderr: stderr_log_level
         }
 
-        while True:
-            ready_to_read, _, _ = select.select([proc.stdout, proc.stderr], [], [])
+        streams = [proc.stdout, proc.stderr]
+
+        while streams:
+            ready_to_read, _, _ = select.select(streams, [], [])
             for io in ready_to_read:
-                text = io.readline()
-                if io == proc.stdout and text == b'':
-                    break
+                text = io.readline().decode('utf8')
+                if text == '':
+                    streams.remove(io)
+                    continue
 
-                if text and not text.isspace():
+                text = text.strip()
+                if text:
                     logger.log(log_level[io], text)
-            else:
-                continue
 
-            break
         return proc.wait()
     finally:
         proc.stdout.close()
