@@ -90,18 +90,19 @@ def modified_call(popenargs, logger, **kwargs):
             proc.stderr: stderr_log_level
         }
 
-        def check_io():
-            ready_to_read = select.select([proc.stdout, proc.stderr], [], [], 1000)[0]
+        streams = [proc.stdout, proc.stderr]
+
+        while streams:
+            ready_to_read, _, _ = select.select(streams, [], [])
             for io in ready_to_read:
-                text = io.read().decode('utf8')
-                for i in filter(lambda x: x and not x.isspace(), text.split('\n')):
-                    logger.log(log_level[io], i)
+                text = io.readline().decode('utf8')
+                if text == '':
+                    streams.remove(io)
+                    continue
 
-        # keep checking stdout/stderr until the proc exits
-        while proc.poll() is None:
-            check_io()
-
-        check_io()  # check again to catch anything after the process exits
+                text = text.strip()
+                if text:
+                    logger.log(log_level[io], text)
 
         return proc.wait()
     finally:

@@ -36,6 +36,7 @@ VERIFY_SKIP_PATHS = [
     '/etc',
     '/dev',
     '/conf/base/etc/master.passwd',
+    '/compat/linux/proc',
     '/boot/zfs/zpool.cache',
     '/usr/local/share/smartmontools/drivedb.h',
     '/boot/device.hints',
@@ -593,6 +594,7 @@ class Configuration(object):
 
         license_data = None
         try:
+            from freenasUI.support.utils import LICENSE_FILE
             with open(LICENSE_FILE, "r") as f:
                 license_data = f.read().rstrip()
         except:
