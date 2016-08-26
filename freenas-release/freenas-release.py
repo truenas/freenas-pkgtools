@@ -36,7 +36,7 @@ delta packags we can make.
 """
 
 debug = 0
-verbose = 1
+verbose = 0
 debugsql = False
 
 # A brief note here:
@@ -1474,7 +1474,8 @@ def AddPackage(pkg, db = None,
                train = None,
                scripts = None,
                fail_on_error = True,
-               restart_services = {}):
+               restart_services = {},
+               delta_count = 5):
     """
     THE ARCHIVE MUST BE LOCKED BY THE CALLER.
 
@@ -1657,7 +1658,10 @@ def AddPackage(pkg, db = None,
                             else:
                                 break
                 # Now get the previous versions of this package for this train
-                previous_versions = db.RecentPackageVersionsForTrain(pkg, train)
+                if delta_count:
+                    previous_versions = db.RecentPackageVersionsForTrain(pkg, train, count=delta_count)
+                else:
+                    previous_versions = None
 
                 # Find out if there are any services listed for this package.
                 package_services = PackageFile.GetPackageServices(path = pkg_file)
@@ -1997,7 +2001,8 @@ def ProcessRelease(source, archive,
                    sign = False,
                    project = "FreeNAS",
                    key_data = None,
-                   changelog = None):
+                   changelog = None,
+                   delta_count = 5):
     """
     Process a directory containing the output from a freenas build.
     We're looking for source/${project}-MANIFEST, which will tell us
@@ -2135,6 +2140,7 @@ def ProcessRelease(source, archive,
                          scripts = scripts,
                          fail_on_error = False,
                          restart_services = services,
+                         delta_count=delta_count,
                          )
 
         # Unlock the archive now
@@ -2395,8 +2401,8 @@ def Check(archive, db, project = "FreeNAS", args = []):
                     if o_vers in expected_packages:
                         if expected_packages[o_vers] != o_sum:
                             print("Package update %s %s->%s, already found with different checksum" \
-                                % (pkg.Name(), upd.Version(), Pkg.Version()), file=sys.stderr)
-                            print("Found again in sequence %s in train %s" % (sequence_File, t), file=sys.stderr)
+                                % (pkg.Name(), upd.Version(), pkg.Version()), file=sys.stderr)
+                            print("Found again in sequence %s in train %s" % (sequence_file, t), file=sys.stderr)
                             continue
                     else:
                         expected_packages[o_vers] = o_sum
@@ -2421,17 +2427,17 @@ def Check(archive, db, project = "FreeNAS", args = []):
                                 print("\tTrain %s, Sequence %s has the duplicate" % (temp_mani.Train(), temp_mani.Sequence()), file=sys.stderr)
                         expected_notes[note_file] = True
                         if debug:  print("Found Note %s in Train %s Sequence %s" % (note_file, temp_mani.Train(), temp_mani.Sequence()), file=sys.stderr)
+                expected_validator = {}
                 for validator in temp_mani.ValidationProgramList():
                     expected_validator[validator["Name"], validator["Kind"]] = validator["Checksum"]
                 # Now check against the database
-                for seq in db.FindValidatorsForSequence(temp_mani.Sequence()):
-                    v = l[seq]
+                for (seq, v)  in db.FindValidatorsForSequence(temp_mani.Sequence()).items():
                     k = v["Kind"]
                     n = v["Name"]
                     c = v["Checksum"]
                     if (n, k) not in expected_validator:
                         print("Found %s validator %s in database, but not in manifest for sequence %s" % (k, n, seq), file=sys.stderr)
-                    elif v[n, k] != expected_validator[n, k]:
+                    elif c != expected_validator[n, k]:
                         print("%s validator has different checksum in database and manifest for sequence %s" % (k, n, seq), file=sys.stderr)
                     
         # Now let's check the found_contents and expected_contents dictionaries
@@ -2965,10 +2971,10 @@ def RemoveRelease(archive, db, project, sequence, dbonly = False, shlist = None)
             db.PackageUpdatesDeletePkg(pkg)
                 
         # Now we look for updates _from_ this version.
-        updates = db.UpdatesFromPackage(pkg)
-        if updates:
-            print("Doesn't look like we can delete package %s-%s entirely" % (pkg.Name(), pkg.Version()), file=sys.stderr)
-            continue
+        updates = db.UpdatesFromPackage(pkg, count = 0)
+        for update_version in updates:
+            update_pkg = Package.Package(pkg.Name(), update_version)
+            RemovePackageUpdate(archive, db, update_pkg, pkg.Version(), shlist = shlist);
         # Next, remove any ServiceRestarts for this version of the package
         db.ServiceRestartDeleteForPackage(pkg)
         # Nothing to delete from PackageUpdates, so now we want to
@@ -3369,7 +3375,7 @@ or	{0} extract [--dest dest] [--tar] --train=TRAIN""".format(sys.argv[0]), file=
         if "/" in sequence:
             (train, sequence) = sequence.split("/")
             print("train = %s, sequence = %s" % (train, sequence), file=sys.stderr)
-            if not train train or not sequence:
+            if not train or not sequence:
                 print("Don't know how to handle %s" % args[0], file=sys.stderr)
                 sys.exit(1)
             manifest_file = os.path.join(archive, train, sequence)
@@ -3550,6 +3556,8 @@ def main():
     key_data = None
     # Changelog
     changelog = None
+    # Number of deltas to create
+    delta_count = 5
     # Configuration file
     # Can be over-ridden
     if os.geteuid() == 0:
@@ -3565,6 +3573,7 @@ def main():
                     "key=",
                     "project=",
                     "changelog=",
+                    "deltas=",
                     "debug", "verbose",
                 ]
 
@@ -3592,6 +3601,8 @@ def main():
             changelog = a
         elif o in ("--config"):
             config_file = a
+        elif o in ("--deltas"):
+            delta_count = a
         else:
             usage()
 
@@ -3636,7 +3647,8 @@ def main():
         import OpenSSL.crypto as Crypto
         try:
             key_contents = open(key_file).read()
-            key_data = Crypto.load_privatekey(Crypto.FILETYPE_PEM, key_contents)
+            key_password = os.environ.pop("IX_KEY_PASSWORD", None)
+            key_data = Crypto.load_privatekey(Crypto.FILETYPE_PEM, key_contents, passphrase=key_password)
         except:
             print("Cannot open key file %s, aborting" % key_file, file=sys.stderr)
             sys.exit(1)
@@ -3646,7 +3658,11 @@ def main():
             print("No source directories specified", file=sys.stderr)
             usage()
         for source in args:
-            ProcessRelease(source, archive, db, project = project_name, key_data = key_data, changelog = changelog)
+            ProcessRelease(source, archive, db,
+                           project=project_name,
+                           key_data=key_data,
+                           changelog=changelog,
+                           delta_count=delta_count)
     elif cmd == "check":
         Check(archive, db, project = project_name, args = args)
     elif cmd == "rebuild":

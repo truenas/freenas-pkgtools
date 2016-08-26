@@ -31,6 +31,11 @@ REVISION!=	git rev-parse --short HEAD
 REVISION=	1
 .endif
 
+# Why did this stop working?
+.if !defined(PYTHON_PKGNAMEPREFIX)
+PYTHON_PKGNAMEPREFIX=py*-
+.endif
+
 RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}openssl \
 		${PYTHON_PKGNAMEPREFIX}sqlite3 \
 		${PYTHON_PKGNAMEPREFIX}six \
@@ -53,7 +58,7 @@ PACKAGE_DIR=	/tmp/Packages
 package: install
 	mkdir -p ${PACKAGE_DIR}
 	( echo ' { '; for dep in ${RUN_DEPENDS}; do \
-		pkg query "	\"%n\" : { \"origin\" : \"%o\", \"version\" : \"%v\" }," $$dep; \
+		pkg query --glob "	\"%n\" : { \"origin\" : \"%o\", \"version\" : \"%v\" }," "$$dep"; \
 		done ; echo '}' ) | \
 		python -c 'import os, sys, json; m = json.load(open(sys.argv[1])); \
 			m["version"] = "'${REVISION}'"; d = eval(sys.stdin.read()); \
