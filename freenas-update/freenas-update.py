@@ -3,7 +3,6 @@ from __future__ import print_function
 
 import getopt
 import logging
-import logging.config
 import os
 import sys
 import tarfile
@@ -14,6 +13,7 @@ sys.path.append("/usr/local/lib")
 import freenasOS.Configuration as Configuration
 import freenasOS.Update as Update
 import freenasOS.Exceptions as Exceptions
+from freenasOS import log_to_handler
 
 
 class ProgressBar(object):
@@ -90,26 +90,26 @@ class UpdateHandler(object):
             display_rate = ' Rate: {0} B/s'.format(download_rate) if download_rate else ''
             self.details = 'Downloading: {0} Progress:{1}{2}{3}'.format(
                 self.pkgname, progress, display_size, display_rate
-                )
+            )
+        self.increment_progress()
 
+    def install_handler(self, index, name, packages):
+        self.indeterminate = False
+        total = len(packages)
+        self.numfilesdone = index
+        self.numfilesdone = total
+        self.progress = int((float(index) / float(total)) * 100.0)
+        self.operation = 'Installing'
+        self.details = 'Installing {0}'.format(name)
+        self.increment_progress()
+
+    def increment_progress(self):
         # Doing the drill below as there is a small window when
         # step*progress logic does not catch up with the new value of step
         if self.progress >= self.master_progress:
             self.master_progress = self.progress
         if self.update_progress is not None:
             self.update_progress(self.master_progress, self.details)
-
-
-class StartsWithFilter(logging.Filter):
-    def __init__(self, params):
-        self.params = params
-
-    def filter(self, record):
-        if self.params:
-            allow = not any(record.msg.startswith(x) for x in self.params)
-        else:
-            allow = True
-        return allow
 
 
 def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
@@ -136,6 +136,7 @@ def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
             if verbose:
                 print("Done extracting {0}".format(f.name), file=sys.stderr)
     return True
+
 
 def PrintDifferences(diffs):
     for type in diffs:
@@ -213,6 +214,7 @@ def DoDownload(train, cache_dir, pkg_type, verbose):
 
     return rv
 
+
 def DoUpdate(cache_dir, verbose):
     """
     Common code to apply an update once it's been downloaded.
@@ -238,9 +240,20 @@ def DoUpdate(cache_dir, verbose):
     if not diffs:
         log.debug("No updates to apply")
         return False
-    
+
     try:
-        rv = Update.ApplyUpdate(cache_dir)
+        if not verbose:
+            progress_bar = ProgressBar()
+            handler = UpdateHandler(progress_bar.update)
+            rv = Update.ApplyUpdate(
+                cache_dir,
+                install_handler=handler.install_handler,
+            )
+            if rv is False:
+                progress_bar.update(message="Updates were not applied")
+            progress_bar.finish()
+        else:
+            rv = Update.ApplyUpdate(cache_dir)
     except BaseException as e:
         log.error("Unable to apply update: {0}".format(str(e)))
         raise
@@ -248,39 +261,10 @@ def DoUpdate(cache_dir, verbose):
         print("System should be rebooted now", file=sys.stderr)
 
     return rv
-        
+
+
 def main():
     global log
-
-    log_config_dict = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'simple': {
-                'format': '[%(name)s:%(lineno)s] %(message)s',
-            },
-        },
-        'filters': {
-            'cleandownload': {
-                '()': StartsWithFilter,
-                'params': ['TryGetNetworkFile', 'Searching']
-            }
-        },
-        'handlers': {
-            'std': {
-                'class': 'logging.StreamHandler',
-                'level': 'DEBUG',
-                'stream': 'ext://sys.stderr',
-            },
-        },
-        'loggers': {
-            '': {
-                'handlers': ['std'],
-                'level': 'DEBUG',
-                'propagate': True,
-            },
-        },
-    }
 
     def usage():
         print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [-v] <cmd>
@@ -334,9 +318,8 @@ where cmd is one of:
         else:
             assert False, "unhandled option {0}".format(o)
 
-    if not verbose:
-        log_config_dict['handlers']['std']['filters'] = ['cleandownload']
-    logging.config.dictConfig(log_config_dict)
+    if verbose:
+        log_to_handler('stderr')
     log = logging.getLogger('freenas-update')
 
     config = Configuration.Configuration()
@@ -400,7 +383,7 @@ where cmd is one of:
                     print("No updates available")
                 Update.RemoveUpdate(cache_dir)
                 sys.exit(1)
-                
+
         try:
             rv = DoUpdate(cache_dir, verbose)
         except:
@@ -422,7 +405,7 @@ where cmd is one of:
                 usage()
         except:
             usage()
-        
+
         # Frozen tarball.  We'll extract it into the cache directory, and
         # then add a couple of things to make it pass sanity, and then apply it.
         # For now we just copy the code above.
@@ -458,6 +441,6 @@ where cmd is one of:
                 sys.exit(0)
             else:
                 sys.exit(1)
-            
+
 if __name__ == "__main__":
     sys.exit(main())
