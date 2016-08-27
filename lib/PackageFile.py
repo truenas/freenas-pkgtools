@@ -270,7 +270,7 @@ def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=Fa
         if old_files[entry] != new_files[entry]:
             # The metadata is different.
             # What happens if it's a directory in one, and a file in the other?
-            print >> sys.stderr, "#### adding %s simply because metadata changed" % entry
+            print("#### adding %s simply because metadata changed" % entry, file=sys.stderr)
             if entry in pkg2_manifest[kPkgDirsKey]:
                 # It's a directory.
                 new_manifest[kPkgDirsKey][entry] = pkg2_manifest[kPkgDirsKey][entry]
@@ -280,7 +280,7 @@ def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=Fa
                 new_manifest[kPkgFilesKey][entry] = pkg2_manifest[kPkgFilesKey][entry]
                 diffs[kPkgFilesKey][entry] = pkg2_manifest[kPkgFilesKey][entry]
             else:
-                print >> sys.stderr, "%s is not in pkg2_manifest? %s" % (entry, pkg2_manifest)
+                print("%s is not in pkg2_manifest? %s" % (entry, pkg2_manifest), file=sys.stderr)
                 sys.exit(1)
     # If there are no diffs, print a message, and exit without
     # creating a file.
