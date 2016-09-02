@@ -333,7 +333,7 @@ def PruneClones(cb=None):
     Attempt to prune boot environments based on age.
     It will try deleting BEs until either:
     1:  There are no more BEs suitable for deletion.
-    2:  At least 80% of the pool is free.
+    2:  At least 20% of the pool is free.
     3:  At least 2gbytes is free.
     If cb is not None, it will be called with something.
 
@@ -358,7 +358,7 @@ def PruneClones(cb=None):
         mbytes_min = 2 * 1024 * 1024
         if (size - used) < mbytes_min:
             return False
-        if ((used * 100.0) / size) < 80.0:
+        if ((used * 100.0) / size) > 80.0:
             return False
         return True
 
@@ -1236,6 +1236,8 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False):
     if reboot:
         # Need to create a new boot environment
         try:
+            # Need to check if boot pool is free.
+            PruneClones()
             if CreateClone(new_boot_name) is False:
                 log.debug("Failed to create BE %s" % new_boot_name)
                 # It's possible the boot environment already exists.
