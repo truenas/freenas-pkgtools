@@ -2883,7 +2883,7 @@ def RemoveRelease(archive, db, project, sequence, dbonly = False, shlist = None)
         print("Deleting sequence %s from manifest table" % sequence, file=sys.stderr)
     db.ManifestDeleteSequence(sequence)
     # Next, let's go through the notes
-    for note in notes:
+    for note in notes or []:
         # note is the name of the note, and notes[note] is the path
         if debug or verbose:
             print("Deleting note %s" % note, file=sys.stderr)
@@ -2925,7 +2925,7 @@ def RemoveRelease(archive, db, project, sequence, dbonly = False, shlist = None)
                 print("Could not remove validation script %s: %s" % (f, str(e)), file=sys.stderr)
 
     # Now we need to go through the packages
-    for pkg in pkgs:
+    for pkg in pkgs or []:
         # For each package, we need to see if this is the
         # only reference to it in Maifests
         # So let's see if any other sequences reference it.
@@ -2972,7 +2972,7 @@ def RemoveRelease(archive, db, project, sequence, dbonly = False, shlist = None)
                 
         # Now we look for updates _from_ this version.
         updates = db.UpdatesFromPackage(pkg, count = 0)
-        for update_version in updates:
+        for update_version in updates or []:
             update_pkg = Package.Package(pkg.Name(), update_version)
             RemovePackageUpdate(archive, db, update_pkg, pkg.Version(), shlist = shlist);
         # Next, remove any ServiceRestarts for this version of the package
@@ -3459,6 +3459,8 @@ or	{0} extract [--dest dest] [--tar] --train=TRAIN""".format(sys.argv[0]), file=
 
     for pkg_file in pkg_files:
         try:
+            import shutil
+            
             dst_file = os.path.basename(pkg_file)
             dst_file = os.path.join(dest, dst_file)
             shutil.copy(pkg_file, dst_file)
