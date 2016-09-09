@@ -329,7 +329,7 @@ def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=Fa
 
     pkg2_tarfile.close()
     pkg2_tarfile = tarfile.open(pkg2, "r")
-    member = next(pkg2_tarfile)
+    (nm, member) = FindManifest(pkg2_tarfile)
     
     # Now copy files from pkg2 to new_tf
     # We want to do this by going through pkg2_tarfile.
