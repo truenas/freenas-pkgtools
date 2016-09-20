@@ -21,33 +21,42 @@ class ProgressBar(object):
         self.message = None
         self.percentage = 0
         self.write_stream = sys.stderr
-        self.write_stream.write('\n')
+        self.used_flag = False
+
+    def __enter__(self):
+        return self
 
     def draw(self):
         progress_width = 40
         filled_width = int(self.percentage * progress_width)
         self.write_stream.write('\033[2K\033[A\033[2K\r')
         self.write_stream.write('Status: {}\n'.format(self.message))
-        self.write_stream.write('Total Progress: [{}{}] {:.2%}'.format(
-            '#' * filled_width,
-            '_' * (progress_width - filled_width),
-            self.percentage))
-
+        self.write_stream.write(
+            'Total Progress: [{}{}] {:.2%}'.format(
+                '#' * filled_width,
+                '_' * (progress_width - filled_width),
+                self.percentage
+            )
+        )
         self.write_stream.flush()
 
     def update(self, percentage=None, message=None):
+        if not self.used_flag:
+            self.write_stream.write('\n')
+            self.used_flag = True
         if percentage:
             self.percentage = float(percentage / 100.0)
-
         if message:
             self.message = message
-
         self.draw()
 
     def finish(self):
         self.percentage = 1
-        self.draw()
-        self.write_stream.write('\n')
+
+    def __exit__(self, type, value, traceback):
+        if self.used_flag:
+            self.draw()
+            self.write_stream.write('\n')
 
 
 class UpdateHandler(object):
@@ -173,18 +182,17 @@ def DoDownload(train, cache_dir, pkg_type, verbose):
 
     try:
         if not verbose:
-            progress_bar = ProgressBar()
-            handler = UpdateHandler(progress_bar.update)
-            rv = Update.DownloadUpdate(
-                train,
-                cache_dir,
-                get_handler=handler.get_handler,
-                check_handler=handler.check_handler,
-                pkg_type=pkg_type,
-            )
-            if rv is False:
-                progress_bar.update(message="No updates available")
-            progress_bar.finish()
+            with ProgressBar() as progress_bar:
+                handler = UpdateHandler(progress_bar.update)
+                rv = Update.DownloadUpdate(
+                    train,
+                    cache_dir,
+                    get_handler=handler.get_handler,
+                    check_handler=handler.check_handler,
+                    pkg_type=pkg_type,
+                )
+                if rv is False:
+                    progress_bar.update(message="No updates available")
         else:
             rv = Update.DownloadUpdate(train, cache_dir, pkg_type=pkg_type)
     except Exceptions.ManifestInvalidSignature:
@@ -243,15 +251,14 @@ def DoUpdate(cache_dir, verbose):
 
     try:
         if not verbose:
-            progress_bar = ProgressBar()
-            handler = UpdateHandler(progress_bar.update)
-            rv = Update.ApplyUpdate(
-                cache_dir,
-                install_handler=handler.install_handler,
-            )
-            if rv is False:
-                progress_bar.update(message="Updates were not applied")
-            progress_bar.finish()
+            with ProgressBar() as progress_bar:
+                handler = UpdateHandler(progress_bar.update)
+                rv = Update.ApplyUpdate(
+                    cache_dir,
+                    install_handler=handler.install_handler,
+                )
+                if rv is False:
+                    progress_bar.update(message="Updates were not applied")
         else:
             rv = Update.ApplyUpdate(cache_dir)
     except BaseException as e:
