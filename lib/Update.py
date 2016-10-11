@@ -321,9 +321,12 @@ def CloneSetAttr(clone, **kwargs):
         tval = bool(kwargs["keep"])
         try:
             ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(clone["realname"]))
-            ds.properties["beadm:keep"].value = str(tval)
+            if "beadm:keep" in ds.properties:
+                ds.properties["beadm:keep"].value = str(tval)
+            else:
+                ds.properties["beadm:keep"] = libzfs.ZFSUserProperty(str(tval))
         except:
-            log.debug("Unable to set beadm:keep value on BE {0}".format(clone["realname"]))
+            log.debug("Unable to set beadm:keep value on BE {0}".format(clone["realname"]), exc_info=True)
         return True
     return False
 
