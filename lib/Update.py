@@ -9,6 +9,8 @@ import sys
 import random
 import shutil
 import fcntl
+import errno
+
 try:
     import libzfs
 except ImportError:
@@ -24,7 +26,7 @@ import freenasOS.Installer as Installer
 from freenasOS.Exceptions import (
     UpdateIncompleteCacheException, UpdateInvalidCacheException, UpdateBusyCacheException,
     UpdateBootEnvironmentException, UpdatePackageException, UpdateSnapshotException,
-    ManifestInvalidSignature, UpdateManifestNotFound
+    ManifestInvalidSignature, UpdateManifestNotFound, UpdateInsufficientSpace,
 )
 
 log = logging.getLogger('freenasOS.Update')
@@ -331,7 +333,7 @@ def CloneSetAttr(clone, **kwargs):
     return False
 
 
-def PruneClones(cb=None):
+def PruneClones(cb=None, required=0):
     """
     Attempt to prune boot environments based on age.
     It will try deleting BEs until either:
@@ -339,31 +341,17 @@ def PruneClones(cb=None):
     2:  At least 80% of the pool is free.
     3:  At least 2gbytes is free.
     If cb is not None, it will be called with something.
-
+    required should be the estimated size (in bytes)
+    needed for the install.
     """
-    def PoolInfo(pool_name="freenas-boot"):
-        """
-        Return some info about the pool, namely the
-        amount of available space and the amount of used
-        space.  This would be easier with py-libzfs.
-        Always returns a two-tuple.
-        """
-        try:
-            cmd = ["/sbin/zpool", "get", "-Hp", "-o", "value",
-                   "size,allocated", pool_name]
-            (size, used) = subprocess.check_output(cmd).split()
-            return (int(size), int(used))
-        except:
-            log.debug("Could not get pool information")
-            return (None, None)
+    def PruneDone(req):
+        # We'll say an install requires at least 512mbytes.
+        mbytes_min = 512 * 1024 * 1024
+        if req > mbytes_min:
+            mbytes_min = req
+            
+        return Configuration.CheckFreeSpace(pool=freenas_pool, required=mbytes_min)
 
-    def PruneDone(size, used):
-        mbytes_min = 2 * 1024 * 1024
-        if (size - used) < mbytes_min:
-            return False
-        if ((used * 100.0) / size) < 80.0:
-            return False
-        return True
 
     def DCW(be):
         """
@@ -394,11 +382,9 @@ def PruneClones(cb=None):
             return False
         return True
 
-    (size, used) = PoolInfo()
-    if size is None:
-        log.error("Cannot get pool information, not pruning")
-        return False
-    if PruneDone(size, used):
+
+    
+    if PruneDone(required):
         log.debug("No pruning necessary")
         return True
     clones = sorted(ListClones(), key=lambda be: be["created"])
@@ -408,11 +394,7 @@ def PruneClones(cb=None):
             log.debug("I want to get rid of clone %s" % be["name"])
             if DeleteClone(be["realname"]) is True:
                 log.debug("Successfully deleted clone %s" % be["realname"])
-                (size, used) = PoolInfo()
-                if size is None:
-                    log.debug("Can no longer get pool information")
-                    return False
-                if PruneDone(size, used):
+                if PruneDone(required):
                     log.debug("Pruning done!")
                     return True
             else:
@@ -876,7 +858,9 @@ def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None)
     return new_manifest
 
 
-def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_type=None):
+def DownloadUpdate(train, directory, get_handler=None,
+                   check_handler=None, pkg_type=None,
+                   ignore_space=False):
     """
     Download, if necessary, the LATEST update for train; download
     delta packages if possible.  Checks to see if the existing content
@@ -1031,7 +1015,8 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
             if check_handler:
                 check_handler(indx + 1, pkg=pkg, pkgList=download_packages)
             pkg_file = conf.FindPackageFile(
-                pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type
+                pkg, save_dir=directory, handler=get_handler, pkg_type=pkg_type,
+                ignore_space=ignore_space
             )
             if pkg_file is None:
                 log.error("Could not download package file for %s" % pkg.Name())
@@ -1042,7 +1027,11 @@ def DownloadUpdate(train, directory, get_handler=None, check_handler=None, pkg_t
 
         # Almost done:  get a changelog if one exists for the train
         # If we can't get it, we don't care.
-        with conf.GetChangeLog(train, save_dir=directory, handler=get_handler):
+        try:
+            with conf.GetChangeLog(train, save_dir=directory, handler=get_handler):
+                pass
+        except AttributeError:
+            # GetChangeLog can return None, which throws things, no pun intended
             pass
         # Then save the manifest file.
         # Create the SEQUENCE file.
@@ -1170,7 +1159,7 @@ def ServiceRestarts(directory):
     return retval
 
 
-def ApplyUpdate(directory, install_handler=None, force_reboot=False):
+def ApplyUpdate(directory, install_handler=None, force_reboot=False, ignore_space=False):
     """
     Apply the update in <directory>.  As with PendingUpdates(), it will
     have to verify the contents before it actually installs them, so
@@ -1235,6 +1224,41 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False):
 
     log.debug("new_boot_name = %s, reboot = %s" % (new_boot_name, reboot))
 
+    installer = Installer.Installer(
+        manifest=new_manifest,
+        config=conf
+    )
+    installer.GetPackages(pkgList=updated_packages)
+    log.debug("Installer got packages %s" % installer.Packages())
+    
+    """
+    There is no way around this:  this is a horrible hack.  It
+    only works with gzipped files, the module for which, for some
+    reason, does not have a function or method to get the uncompressed
+    size.
+    """
+    def ActualSize(gzf):
+        try:
+            import struct
+            cur = gzf.tell()
+            gzf.seek(-4, 2)    # Last 4 bytes have the uncompressed size
+            (rv,) = struct.unpack("<I", gzf.read(4))
+            gzf.seek(cur, 0)
+        except:
+            rv = os.fstat(gzf.fileno()).st_size
+        return rv
+
+    space_needed = 0
+    for f in installer.Packages():
+        [(dc, fobj)] = f.items()
+        try:
+            space_needed += ActualSize(fobj)
+        except:
+            pass
+        
+    if not ignore_space and not PruneClones(required=space_needed):
+        raise UpdateInsufficientSpace("Insufficent space to install update")
+    
     mount_point = None
     if reboot:
         # Need to create a new boot environment
@@ -1344,6 +1368,8 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False):
         if "Restart" in changes:
             service_list = StopServices(changes["Restart"])
 
+    installer.SetRoot(mount_point)
+    
     # Now we start doing the update!
     # If we have to reboot, then we need to
     # make a new boot environment, with the appropriate name.
@@ -1365,14 +1391,7 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False):
                 raise UpdatePackageException(s)
             conf.PackageDB(mount_point).RemovePackage(pkg.Name())
 
-        installer = Installer.Installer(
-            manifest=new_manifest,
-            root=mount_point,
-            config=conf
-        )
-        installer.GetPackages(pkgList=updated_packages)
-        log.debug("Installer got packages %s" % installer._packages)
-        # Now to start installing them
+        # Now to start installing the packages
         rv = False
         if installer.InstallPackages(handler=install_handler) is False:
             log.error("Unable to install packages")

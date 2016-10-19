@@ -178,7 +178,7 @@ def PrintDifferences(diffs):
             print("*** Unknown key {0} (value {1})".format(type, str(diffs[type])), file=sys.stderrr)
 
 
-def DoDownload(train, cache_dir, pkg_type, verbose):
+def DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=False):
 
     try:
         if not verbose:
@@ -194,7 +194,7 @@ def DoDownload(train, cache_dir, pkg_type, verbose):
                 if rv is False:
                     progress_bar.update(message="No updates available")
         else:
-            rv = Update.DownloadUpdate(train, cache_dir, pkg_type=pkg_type)
+            rv = Update.DownloadUpdate(train, cache_dir, pkg_type=pkg_type, ignore_space=ignore_space)
     except Exceptions.ManifestInvalidSignature:
         log.error("Manifest has invalid signature")
         print("Manifest has invalid signature", file=sys.stderr)
@@ -215,15 +215,19 @@ def DoDownload(train, cache_dir, pkg_type, verbose):
         log.error(str(e))
         print("Update not permitted:\n{0}".format(e.value), file=sys.stderr)
         sys.exit(1)
+    except Exceptions.UpdateInsufficientSpace as e:
+        log.error(str(e), exc_info=True)
+        print(e.value if e.value else "Insufficient space for download")
+        sys.exit(1)
     except BaseException as e:
-        log.error(str(e))
+        log.error(str(e), exc_info=True)
         print("Received exception during download phase, cannot update", file=sys.stderr)
         sys.exit(1)
 
     return rv
 
 
-def DoUpdate(cache_dir, verbose):
+def DoUpdate(cache_dir, verbose, ignore_space=False):
     """
     Common code to apply an update once it's been downloaded.
     This will handle all of the exceptions in a common fashion.
@@ -256,11 +260,16 @@ def DoUpdate(cache_dir, verbose):
                 rv = Update.ApplyUpdate(
                     cache_dir,
                     install_handler=handler.install_handler,
+                    ignore_space=ignore_space
                 )
                 if rv is False:
                     progress_bar.update(message="Updates were not applied")
         else:
-            rv = Update.ApplyUpdate(cache_dir)
+            rv = Update.ApplyUpdate(cache_dir, ignore_space=ignore_space)
+    except Exceptions.UpdateInsufficientSpace as e:
+        log.error(str(e))
+        print(e.value if e.value else "Insufficient space for update")
+        sys.exit(1)
     except BaseException as e:
         log.error("Unable to apply update: {0}".format(str(e)))
         raise
@@ -269,12 +278,11 @@ def DoUpdate(cache_dir, verbose):
 
     return rv
 
-
 def main():
     global log
 
     def usage():
-        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [-v] <cmd>
+        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [--force|-F] [-v] <cmd>
 or	{0} <update_tar_file>
 where cmd is one of:
         check\tCheck for updates
@@ -282,7 +290,7 @@ where cmd is one of:
         sys.exit(1)
 
     try:
-        short_opts = "C:dRT:v"
+        short_opts = "C:dRT:vF"
         long_opts = [
             "cache=",
             "debug",
@@ -290,6 +298,7 @@ where cmd is one of:
             "train=",
             "verbose",
             "no-delta",
+            "force",
             "snl"
         ]
         opts, args = getopt.getopt(sys.argv[1:], short_opts, long_opts)
@@ -306,7 +315,8 @@ where cmd is one of:
     train = None
     pkg_type = None
     snl = False
-
+    force = False
+    
     for o, a in opts:
         if o in ("-v", "--verbose"):
             verbose = True
@@ -322,6 +332,8 @@ where cmd is one of:
             pkg_type = Update.PkgFileFullOnly
         elif o in ("--snl"):
             snl = True
+        elif o in ("-F", "--force"):
+            force = True
         else:
             assert False, "unhandled option {0}".format(o)
 
@@ -343,7 +355,7 @@ where cmd is one of:
         # we make a temporary directory and use that.  We
         # have to clean up afterwards in that case.
 
-        rv = DoDownload(train, cache_dir, pkg_type, verbose)
+        rv = DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=force)
         if rv is False:
             if verbose:
                 print("No updates available")
@@ -384,7 +396,7 @@ where cmd is one of:
             raise
 
         if do_download:
-            rv = DoDownload(train, cache_dir, pkg_type, verbose)
+            rv = DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=force)
             if rv is False:
                 if verbose:
                     print("No updates available")
@@ -392,7 +404,7 @@ where cmd is one of:
                 sys.exit(1)
 
         try:
-            rv = DoUpdate(cache_dir, verbose)
+            rv = DoUpdate(cache_dir, verbose, ignore_space=force)
         except:
             sys.exit(1)
         else:
@@ -438,7 +450,7 @@ where cmd is one of:
             s.write(config.UpdateServerName())
 
         try:
-            rv = DoUpdate(cache_dir, verbose)
+            rv = DoUpdate(cache_dir, verbose, ignore_space=force)
         except:
             sys.exit(1)
         else:
