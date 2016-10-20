@@ -75,8 +75,8 @@ def CheckFreeSpace(path=None, pool=None, required=0):
     """
     import libzfs
     from bsd import statfs
-    # Don't let it get above 85% used for zfs
-    zfs_max_pct = 85
+    # Don't let it get above 90% used for zfs
+    zfs_max_pct = 90
     # Unless the free space is at least 4x the required size
     zfs_multiple = 4
 
