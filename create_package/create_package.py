@@ -6,6 +6,7 @@ import os
 import sys
 import re
 import json
+import subprocess
 import tarfile
 import getopt
 import hashlib
@@ -19,7 +20,7 @@ else:
 
 debug = 0
 verbose = False
-
+PIGZ_PATH = "/usr/local/bin/pigz"
 
 # Scan a directory hierarchy, creating a
 # "files" and "directories" set of dictionaries.
@@ -423,8 +424,15 @@ def main():
 
     # I would LOVE to be able to use xz, but python's tarfile does not
     # (as of when I write this) support it.  Python 3 has it.
-    tf = tarfile.open(output, "w:gz", format=tarfile.PAX_FORMAT)
-
+    if os.path.exists(PIGZ_PATH):
+        outfile = open(output, "wb")
+        pigz = subprocess.Popen([PIGZ_PATH], bufsize=1024*1024,
+                             stdin=subprocess.PIPE, stdout=outfile)
+        tf = tarfile.open(fileobj=pigz.stdin, mode="w|", format=tarfile.PAX_FORMAT)
+    else:
+        tf = tarfile.open(output, "w:gz", format=tarfile.PAX_FORMAT)
+        pigz = None
+        
     # Add the manifest string as the file "+MANIFEST"
     mani_file_info = tarfile.TarInfo(name="+MANIFEST")
     mani_file_info.size = len(manifest_string)
@@ -444,7 +452,11 @@ def main():
         tf.add(root + dir, arcname=dir, recursive=False)
 
     tf.close()
-
+    if pigz:
+        print("Waiting for pigz to finish", file=sys.stderr)
+        pigz.stdin.close()
+        pigz.wait()
+        
     return 0
 
 if __name__ == "__main__":
