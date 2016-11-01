@@ -61,6 +61,54 @@ log = logging.getLogger('freenasOS.Configuration')
 # List of trains
 TRAIN_FILE = "trains.txt"
 
+def CheckFreeSpace(path=None, pool=None, required=0):
+    """
+    Check for enough free space on the path/pool.
+    If pool is given, or path is on a zfs pool, we'll
+    also check to see if it'll fit.  ("fit" is a bit
+    complicated there -- we want to ensure we don't go
+    over a maximum percentage, unless the amount of data
+    required is less than a reasonable multiple of the free
+    space.)
+    
+    Returns True if it's okay, False otherwise.
+    """
+    import libzfs
+    from bsd import statfs
+    # Don't let it get above 90% used for zfs
+    zfs_max_pct = 90
+    # Unless the free space is at least 4x the required size
+    zfs_multiple = 4
+
+    log.debug("CheckFreeSpace(path={}, pool={}, required={})".format(path, pool, required))
+    
+    if path == pool and path is None:
+        raise ValueError("One of path or pool must be set")
+    if path is not None and pool is not None:
+        raise ValueError("Only one of path or pool may be set")
+
+    # First we check the path, if given
+    if path:
+        mntpoint = statfs(path)
+        required_blocks = int(required / mntpoint.blocksize)
+        if required_blocks > mntpoint.free_blocks:
+            log.debug("Required blocks ({}) > free blocks ({})".format(required_blocks, mntpoint.free_blocks))
+            return False
+        if mntpoint.fstype == "zfs" and not pool:
+            pool = mntpoint.source.split("/")[0]
+            
+    if pool:
+        p = libzfs.ZFS().get(pool)
+        pool_size = p.properties["size"].parsed
+        pool_used = p.properties["allocated"].parsed
+        pool_free = p.properties["free"].parsed
+        pool_max = int(pool_size * (zfs_max_pct / 100.0))
+        if (pool_used + required) >= pool_max:
+            if pool_free > (zfs_multiple * required):
+                return True
+            log.debug("pool_used ({}) + required ({}) > pool_max ({})".format(pool_used, required, pool_max))
+            return False
+    return True
 
 def ChecksumFile(fobj):
     # Produce a SHA256 checksum of a file.
@@ -564,7 +612,9 @@ class Configuration(object):
     def UpdateServerSigned(self):
         return self._update_server.signature_required
 
-    def TryGetNetworkFile(self, file=None, url=None, handler=None, pathname=None, reason=None, intr_ok=False):
+    def TryGetNetworkFile(self, file=None, url=None, handler=None,
+                          pathname=None, reason=None, intr_ok=False,
+                          ignore_space=False):
         AVATAR_VERSION = "X-%s-Manifest-Version" % Avatar()
         current_version = "unknown"
         host_id = None
@@ -680,6 +730,13 @@ class Configuration(object):
                 totalsize = int(furl.info().get('Content-Length').strip())
             except:
                 totalsize = None
+
+            if totalsize and pathname and ignore_space is False:
+                space_needed = totalsize - read
+
+                if CheckFreeSpace(path=pathname, required=space_needed) is False:
+                    # Hm, we don't distinguish between out of space, and zfs performance check
+                    raise Exceptions.UpdateInsufficientSpace("Insufficient space")
 
             chunk_size = 64 * 1024
             mbyte = 1024 * 1024
@@ -1051,7 +1108,8 @@ class Configuration(object):
             log.debug("Could not get ChangeLog.txt, ignoring")
             return None
 
-    def FindPackageFile(self, package, upgrade_from=None, handler=None, save_dir=None, pkg_type=None):
+    def FindPackageFile(self, package, upgrade_from=None, handler=None,
+                        save_dir=None, pkg_type=None, ignore_space=False):
         # Given a package, and optionally a version to upgrade from, find
         # the package file for it.  Returns a file-like
         # object for the package file.
@@ -1151,7 +1209,8 @@ class Configuration(object):
                     handler=handler,
                     pathname=save_name,
                     reason="DownloadPackageFile",
-                    intr_ok=True
+                    intr_ok=True,
+                    ignore_space=ignore_space
                 )
             except BaseException as e:
                 log.debug("Trying to get %s, got exception %s, continuing" % (pFile, str(e)))

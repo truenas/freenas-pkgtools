@@ -938,11 +938,17 @@ class Installer(object):
                         pkgfile.close()
             self._packages = []
 
+    def SetRoot(self, root):
+        self._root = root
+        
     def SetDebug(self, level):
         global debug
         debug = level
         return
 
+    def Packages(self):
+        return self._packages
+    
     def SetVerbose(self, b):
         global verbose
         verbose = b

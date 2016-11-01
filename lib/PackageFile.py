@@ -186,7 +186,7 @@ def usage():
     sys.exit(1)
 
 
-def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=False):
+def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=False, verbose=False):
     from .Installer import GetTarMeta
     
     pkg1_tarfile = tarfile.open(pkg1, "r")
@@ -270,7 +270,7 @@ def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=Fa
         if old_files[entry] != new_files[entry]:
             # The metadata is different.
             # What happens if it's a directory in one, and a file in the other?
-            print >> sys.stderr, "#### adding %s simply because metadata changed" % entry
+            print("#### adding %s simply because metadata changed" % entry, file=sys.stderr)
             if entry in pkg2_manifest[kPkgDirsKey]:
                 # It's a directory.
                 new_manifest[kPkgDirsKey][entry] = pkg2_manifest[kPkgDirsKey][entry]
@@ -280,7 +280,7 @@ def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=Fa
                 new_manifest[kPkgFilesKey][entry] = pkg2_manifest[kPkgFilesKey][entry]
                 diffs[kPkgFilesKey][entry] = pkg2_manifest[kPkgFilesKey][entry]
             else:
-                print >> sys.stderr, "%s is not in pkg2_manifest? %s" % (entry, pkg2_manifest)
+                print("%s is not in pkg2_manifest? %s" % (entry, pkg2_manifest), file=sys.stderr)
                 sys.exit(1)
     # If there are no diffs, print a message, and exit without
     # creating a file.
@@ -315,6 +315,9 @@ def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=Fa
             PackageVersion(pkg2_manifest)
         )
 
+    if verbose:
+        print("New manifest = {0}".format(new_manifest_string), file=sys.stderr)
+        
     new_tf = tarfile.open(output_file, "w:gz", format=tarfile.PAX_FORMAT)
     mani_file_info = tarfile.TarInfo(name="+MANIFEST")
     mani_file_info.size = len(new_manifest_string)
@@ -324,12 +327,22 @@ def DiffPackageFiles(pkg1, pkg2, output_file=None, scripts=None, force_output=Fa
     new_tf.addfile(mani_file_info, mani_file)
     mani_file.close()
 
+    pkg2_tarfile.close()
+    pkg2_tarfile = tarfile.open(pkg2, "r")
+    (nm, member) = FindManifest(pkg2_tarfile)
+    
     # Now copy files from pkg2 to new_tf
     # We want to do this by going through pkg2_tarfile.
     search_dict = dict(diffs[kPkgFilesKey], ** diffs[kPkgDirsKey])
     while member is not None:
+        if verbose:
+            print("Member {0}".format(member.name), file=sys.stderr)
         fname = member.name if member.name in search_dict else "/" + member.name
+        if verbose:
+            print("Looking at member {0}".format(member.name), file=sys.stderr)
         if fname in search_dict:
+            if verbose:
+                print("\tAdding to new tar file", file=sys.stderr)
             if member.issym() or member.islnk():
                 # A link
                 new_tf.addfile(member)

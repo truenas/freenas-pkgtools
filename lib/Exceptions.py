@@ -18,6 +18,17 @@ class UpdateException(Exception):
     pass
 
 
+class UpdateInsufficientSpace(UpdateException):
+    """Raised when there is insufficient space to download
+    a file or install into a new BE.
+    Attributes:
+      value -- a string containing the error message from the script
+    """
+    def __init__(self, value=""):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+    
 class UpdateInvalidUpdateException(UpdateException):
     """Raised when a package validation script fails.
     Attributes:
