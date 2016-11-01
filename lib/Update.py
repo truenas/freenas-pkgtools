@@ -1367,7 +1367,16 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False, ignore_spac
             )
         if "Restart" in changes:
             service_list = StopServices(changes["Restart"])
-
+    cl = FindClone(new_boot_name)
+    if cl is None:
+        s = "Unable to find BE %s just after creation" % new_boot_name
+        log.debug(s)
+        raise UpdateBootEnvironmentException(s)
+    else:
+        if not CloneSetAttr(cl, keep=False):
+            s = "Unable to set keep attribute on BE %s" % new_boot_name
+            log.debug(s)
+            
     installer.SetRoot(mount_point)
     
     # Now we start doing the update!
