@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import getopt
+import hashlib
 
 sys.path.append("/usr/local/lib")
 
@@ -42,9 +43,10 @@ if __name__ == "__main__":
     outfile = None
     config_file = None
     timestamp = None
-
+    validators = []
+    
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "P:C:N:R:T:S:o:t:qvd")
+        opts, args = getopt.getopt(sys.argv[1:], "P:C:N:R:T:S:o:t:V:qvd")
     except getopt.GetoptError as err:
         print(str(err))
         usage()
@@ -62,6 +64,8 @@ if __name__ == "__main__":
             trainname = a
         elif o == "-S":
             sequence = a
+        elif o == '-V':
+            validators.append(a)
         elif o == "-q":
             quiet = True
         elif o == "-t":
@@ -152,6 +156,19 @@ if __name__ == "__main__":
 
         mani.AddPackage(pkg)
 
+    for v in validators:
+        try:
+            with open(v) as f:
+                cksum = hashlib.sha256(f.read()).hexdigest()
+            if Manifest.VALIDATE_UPDATE in v:
+                mani.AddValidationProgram(Manifest.VALIDATE_UPDATE, cksum, kind=Manifest.VALIDATE_UPDATE)
+            elif Manifest.VALIDATE_INSTALL in v:
+                mani.AddValidationProgram(Manifest.VALIDATE_INSTALL, cksum, kind=Manifest.VALIDATE_INSTALL)
+            else:
+                print("Unknown validation script type for {}".format(v), file=sys.stderr)
+        except:
+                print("Unable to add validator {} to manifest".format(v), file=sys.stderr)
+                
     # Don't set the signature
     mani.Validate()
 
