@@ -27,6 +27,7 @@ from freenasOS.Exceptions import (
     UpdateIncompleteCacheException, UpdateInvalidCacheException, UpdateBusyCacheException,
     UpdateBootEnvironmentException, UpdatePackageException, UpdateSnapshotException,
     ManifestInvalidSignature, UpdateManifestNotFound, UpdateInsufficientSpace,
+    InvalidBootEnvironmentNameException,
 )
 
 log = logging.getLogger('freenasOS.Update')
@@ -500,6 +501,13 @@ zfs destroy -r freenas-boot/ROOT/${CURRENT}@Pre-Upgrade-${NEW}
 """
 
 
+def _CheckBEName(name):
+    # Disallow certain characters, because beadm(8) doesn't
+    # quote or validate very well.
+    badChars = "/ *'\"?@"
+    if any(elem in name for elem in badChars):
+        raise InvalidBootEnvironmentNameException
+    
 def CreateClone(name, bename=None, rename=None):
     # Create a boot environment from the current
     # root, using the given name.  Returns False
@@ -516,6 +524,7 @@ def CreateClone(name, bename=None, rename=None):
     # and return an error.
     args = ["create"]
     if bename:
+        _CheckBEName(bename)
         # Due to how beadm works, if we are given a starting name,
         # we need to find the real name.
         cl = FindClone(bename)
@@ -525,6 +534,7 @@ def CreateClone(name, bename=None, rename=None):
         log.debug("FindClone returned %s" % cl)
         args.extend(["-e", cl["realname"]])
     if rename:
+        _CheckBEName(rename)
         temp_name = "Pre-%s-%d" % (name, random.SystemRandom().randint(0, 1024 * 1024))
         args.append(temp_name)
         log.debug("CreateClone with rename, temp_name = %s" % temp_name)
@@ -573,6 +583,9 @@ def RenameClone(oldname, newname):
     # Create a boot environment from the current
     # root, using the given name.  Returns False
     # if it could not create it
+    _CheckBEName(oldname)
+    _CheckBEName(newname)
+    
     args = ["rename", oldname, newname]
     rv = RunCommand(beadm, args)
     if rv is False:
@@ -683,6 +696,8 @@ def UnmountClone(name, mount_point=None):
 
 def DeleteClone(name, delete_grub=False):
     # Delete the clone we created.
+    _CheckBEName(name)
+    
     args = ["destroy", "-F", name]
     rv = RunCommand(beadm, args)
     if rv is False:

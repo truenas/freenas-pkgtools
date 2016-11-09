@@ -62,6 +62,9 @@ class UpdateApplyException(UpdateException):
     pass
 
 
+class InvalidBootEnvironmentNameException(UpdateException):
+    pass
+
 class UpdateBootEnvironmentException(UpdateException):
     pass
 
