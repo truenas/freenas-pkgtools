@@ -531,15 +531,16 @@ def CreateClone(name, bename=None, rename=None):
     else:
         args.append(name)
 
-    if os.path.exists(dsinit) and not RunCommand(dsinit, ["--lock"]):
-        return False
+    try:
+        if os.path.exists(dsinit) and not RunCommand(dsinit, ["--lock"]):
+            return False
 
-    rv = RunCommand(beadm, args)
-    if rv is False:
-        return False
-
-    if os.path.exists(dsinit) and not RunCommand(dsinit, ["--unlock"]):
-        return False
+        rv = RunCommand(beadm, args)
+        if rv is False:
+            return False
+    finally:
+        if os.path.exists(dsinit) and not RunCommand(dsinit, ["--unlock"]):
+            return False
 
     if rename:
         # We've created Pre-<newname>-<random>
