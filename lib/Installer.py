@@ -296,16 +296,27 @@ def RunPkgScript(scripts, type, root=None, **kwargs):
             log.debug("No %s script to run" % type)
         return
 
-    scriptName = "/%d-%s" % (os.getpid(), type)
+    trampoline = kwargs.pop("trampoline", True)
+    
+    scriptName = "%s-%s" % (kwargs.pop("pkgName", str(os.getpid())), type)
     if root and root != "":
-        scriptPath = "%s%s" % (root, scriptName)
+        scriptPath = os.path.join(root, "update-scripts", scriptName)
+        if trampoline:
+            MakeDirs(os.path.join(root, "update-scripts"))
+            with open(os.path.join(root, "update-scripts", "order"), "a") as f:
+                print(scriptName, file=f)
     else:
         # Writing to root isn't ideal, so this should be re-examined
-        scriptName = "/tmp" + scriptName
+        scriptName = os.path.join("/tmp", scriptName)
         scriptPath = scriptName
-
+        trampoline = False
+        
     with open(scriptPath, "w") as f:
         f.write(scripts[type])
+        
+    if trampoline:
+        return
+    
     args = ["/bin/sh", "-x", scriptName]
     if "SCRIPT_ARG" in kwargs and kwargs["SCRIPT_ARG"] is not None:
         args.append(kwargs["SCRIPT_ARG"])
@@ -730,14 +741,16 @@ def install_file(pkgfile, dest):
         # upgrade scripts from the old version.
         if upgrade_aware:
             RunPkgScript(
-                old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE, dest, PKG_PREFIX=prefix
+                old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE, dest, PKG_PREFIX=prefix,
+                pkgName=pkgName,
             )
             RunPkgScript(
                 old_scripts,
                 PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE,
                 dest,
                 PKG_PREFIX=prefix,
-                SCRIPT_ARG="PRE-UPGRADE"
+                SCRIPT_ARG="PRE-UPGRADE",
+                pkgName=pkgName,
             )
 
         # If the new version is a delta package, we do things differently
@@ -749,7 +762,8 @@ def install_file(pkgfile, dest):
             # Run a pre-delta script if any, but only if dest is none
             if dest is None:
                 RunPkgScript(
-                    pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA, dest, PKG_PREFIX=prefix
+                    pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA, dest, PKG_PREFIX=prefix,
+                    pkgName=pkgName,
                 )
 
             # Next step for a delta package is to remove any removed files and directories.
@@ -783,14 +797,16 @@ def install_file(pkgfile, dest):
                     old_scripts,
                     PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DEINSTALL,
                     dest,
-                    PKG_PREFIX=prefix
+                    PKG_PREFIX=prefix,
+                    pkgName=pkgName,
                 )
                 RunPkgScript(
                     old_scripts,
                     PKG_SCRIPT_TYPES.PKG_SCRIPT_DEINSTALL,
                     dest,
                     PKG_PREFIX=prefix,
-                    SCRIPT_ARG="DEINSTALL"
+                    SCRIPT_ARG="DEINSTALL",
+                    pkgName=pkgName,
                 )
 
             if pkgdb.RemovePackageFiles(pkgName) == False:
@@ -813,14 +829,16 @@ def install_file(pkgfile, dest):
                     old_scripts,
                     PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DEINSTALL,
                     dest,
-                    PKG_PREFIX=prefix
+                    PKG_PREFIX=prefix,
+                    pkgName=pkgName,
                 )
                 RunPkgScript(
                     old_scripts,
                     PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL,
                     dest,
                     PKG_PREFIX=prefix,
-                    SCRIPT_ARG="POST-DEINSTALL"
+                    SCRIPT_ARG="POST-DEINSTALL",
+                    pkgName=pkgName,
                 )
 
     if pkgDeltaVersion is not None:
@@ -835,9 +853,11 @@ def install_file(pkgfile, dest):
     # Is this correct behaviour for delta packages?
     if upgrade_aware is False:
         RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_INSTALL,
-                     dest, PKG_PREFIX=prefix)
+                     dest, PKG_PREFIX=prefix, pkgName=pkgName)
         RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL,
-                     dest, PKG_PREFIX=prefix, SCRIPT_ARG="PRE-INSTALL")
+                     dest, PKG_PREFIX=prefix, SCRIPT_ARG="PRE-INSTALL",
+                     pkgName=pkgName,
+                     )
 
     # Go through the tarfile, looking for entries in the manifest list.
     pkgFiles = []
@@ -881,29 +901,41 @@ def install_file(pkgfile, dest):
         pkgdb.AddFilesBulk(pkgFiles)
 
     if upgrade_aware:
-        RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE, dest, PKG_PREFIX=prefix)
+        RunPkgScript(pkgScripts,
+                     PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE,
+                     dest, PKG_PREFIX=prefix,
+                     pkgName=pkgName,
+                     )
         RunPkgScript(
             pkgScripts,
             PKG_SCRIPT_TYPES.PKG_SCRIPT_UPGRADE,
             dest,
             PKG_PREFIX=prefix,
-            SCRIPT_ARG="POST-UPGRADE"
+            SCRIPT_ARG="POST-UPGRADE",
+            pkgName=pkgName,
         )
         if dest is None and pkgDeltaVersion is not None:
             RunPkgScript(
                 pkgScripts,
                 PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_DELTA,
                 dest,
-                PKG_PREFIX=prefix
+                PKG_PREFIX=prefix,
+                pkgName=pkgName,
             )
     else:
-        RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_INSTALL, dest, PKG_PREFIX=prefix)
+        RunPkgScript(pkgScripts,
+                     PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_INSTALL,
+                     dest,
+                     PKG_PREFIX=prefix,
+                     pkgName=pkgName,
+        )
         RunPkgScript(
             pkgScripts,
             PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL,
             dest,
             PKG_PREFIX=prefix,
-            SCRIPT_ARG="POST-INSTALL"
+            SCRIPT_ARG="POST-INSTALL",
+            pkgName=pkgName
         )
     return True
 
