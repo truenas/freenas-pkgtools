@@ -601,6 +601,8 @@ class Manifest(object):
         old_sequence = self._config.SystemManifest().Sequence()
         new_version = self.Version()
         new_sequence = self.Sequence()
+        valid_dir = "."
+        valid_script = "."
         
         def PreExecHook():
             import pwd
@@ -613,6 +615,7 @@ class Manifest(object):
             os.environ["CURRENT_SEQUENCE"] = old_sequence
             os.environ["NEW_VERSION"] = new_version
             os.environ["NEW_SEQUENCE"] = new_sequence
+            os.chdir(valid_dir)
             os.setegid(uid)
             os.seteuid(uid)
             
@@ -652,8 +655,11 @@ class Manifest(object):
             os.lchmod(prog_path, 0o555)
         except:
             pass
+        valid_dir = os.path.dirname(prog_path)
+        valid_script = os.path.join(".", os.path.basename(prog_path))
+        
         try:
-            subprocess.check_output(prog_path, preexec_fn=PreExecHook, stderr=subprocess.STDOUT)
+            subprocess.check_output(valid_script, preexec_fn=PreExecHook, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as err:
             raise Exceptions.UpdateInvalidUpdateException(err.output.rstrip())
         finally:
