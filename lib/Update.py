@@ -541,6 +541,15 @@ def CreateClone(name, bename=None, rename=None):
     else:
         args.append(name)
 
+    # Let's see if the given name already exists
+    try:
+        zfs = libzfs.ZFS()
+        x = zfs.get_dataset("freenas-boot/ROOT/{0}".format(name))
+    except libzfs.ZFSException:
+        pass
+    else:
+        raise KeyError
+    
     try:
         if os.path.exists(dsinit) and not RunCommand(dsinit, ["--lock"]):
             return False
@@ -1279,8 +1288,21 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False, ignore_spac
     if reboot:
         # Need to create a new boot environment
         try:
-            if CreateClone(new_boot_name) is False:
-                log.debug("Failed to create BE %s" % new_boot_name)
+            count = 0
+            create_name = new_boot_name
+            while count < 500:
+                try:
+                    rv = CreateClone(create_name)
+                    break
+                except KeyError:
+                    count = count + 1
+                    create_name = "{0}-{1}".format(new_boot_name, count)
+                    rv = False
+                    continue
+            
+            new_boot_name = create_name
+            if rv is False:
+                log.debug("Failed to create BE %s" % create_name)
                 # It's possible the boot environment already exists.
                 s = None
                 clones = ListClones()
