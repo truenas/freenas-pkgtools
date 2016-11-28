@@ -12,10 +12,9 @@ import freenasOS.Configuration as Configuration
 import freenasOS.Installer as Installer
 
 
-def PrintProgress(pct, name):
-    print("Got %s (%.2f%%)" % (name, pct), file=sys.stderr)
-
-
+def install_handler(index, name, packages):
+    print("Installing {0} ({1} of {2})".format(name, index, len(packages)))
+    
 def usage():
     print("Usage: %s -M manifest [-P package_dir] root" % sys.argv[0], file=sys.stderr)
     print("\tNote:  package dir is parent of Packages directory", file=sys.stderr)
@@ -61,6 +60,6 @@ if __name__ == "__main__":
     if installer.GetPackages() is not True:
         print("Huh, could not install and yet it returned", file=sys.stderr)
 
-    installer.InstallPackages(PrintProgress)
+    installer.InstallPackages(handler=install_handler)
     manifest.Save(root)
     sys.exit(0)
