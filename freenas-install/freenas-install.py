@@ -60,6 +60,8 @@ if __name__ == "__main__":
     if installer.GetPackages() is not True:
         print("Huh, could not install and yet it returned", file=sys.stderr)
 
+    # For installation, we assume that we're running the same kernel as the new system.
+    installer.trampoline = False
     installer.InstallPackages(handler=install_handler)
     manifest.Save(root)
     sys.exit(0)

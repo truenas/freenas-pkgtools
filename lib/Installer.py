@@ -297,14 +297,17 @@ def RunPkgScript(scripts, type, root=None, **kwargs):
         return
 
     trampoline = kwargs.pop("trampoline", True)
-    
     scriptName = "%s-%s" % (kwargs.pop("pkgName", str(os.getpid())), type)
+    
     if root and root != "":
-        scriptPath = os.path.join(root, "update-scripts", scriptName)
         if trampoline:
+            scriptPath = os.path.join(root, "update-scripts", scriptName)
             MakeDirs(os.path.join(root, "update-scripts"))
             with open(os.path.join(root, "update-scripts", "order"), "a") as f:
                 print(scriptName, file=f)
+        else:
+            scriptPath = os.path.join(root, scriptName)
+            scriptName = "/" + scriptName
     else:
         # Writing to root isn't ideal, so this should be re-examined
         scriptName = os.path.join("/tmp", scriptName)
@@ -619,7 +622,7 @@ def install_path(pkgfile, dest):
         return install_file(f, dest)
 
 
-def install_file(pkgfile, dest):
+def install_file(pkgfile, dest, **kwargs):
     from . import Configuration
     global debug, verbose, dryrun
     prefix = None
@@ -743,6 +746,7 @@ def install_file(pkgfile, dest):
             RunPkgScript(
                 old_scripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_UPGRADE, dest, PKG_PREFIX=prefix,
                 pkgName=pkgName,
+                **kwargs
             )
             RunPkgScript(
                 old_scripts,
@@ -751,6 +755,7 @@ def install_file(pkgfile, dest):
                 PKG_PREFIX=prefix,
                 SCRIPT_ARG="PRE-UPGRADE",
                 pkgName=pkgName,
+                **kwargs
             )
 
         # If the new version is a delta package, we do things differently
@@ -764,6 +769,7 @@ def install_file(pkgfile, dest):
                 RunPkgScript(
                     pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_DELTA, dest, PKG_PREFIX=prefix,
                     pkgName=pkgName,
+                    **kwargs
                 )
 
             # Next step for a delta package is to remove any removed files and directories.
@@ -799,6 +805,7 @@ def install_file(pkgfile, dest):
                     dest,
                     PKG_PREFIX=prefix,
                     pkgName=pkgName,
+                    **kwargs
                 )
                 RunPkgScript(
                     old_scripts,
@@ -807,6 +814,7 @@ def install_file(pkgfile, dest):
                     PKG_PREFIX=prefix,
                     SCRIPT_ARG="DEINSTALL",
                     pkgName=pkgName,
+                    **kwargs
                 )
 
             if pkgdb.RemovePackageFiles(pkgName) == False:
@@ -831,6 +839,7 @@ def install_file(pkgfile, dest):
                     dest,
                     PKG_PREFIX=prefix,
                     pkgName=pkgName,
+                    **kwargs
                 )
                 RunPkgScript(
                     old_scripts,
@@ -839,6 +848,7 @@ def install_file(pkgfile, dest):
                     PKG_PREFIX=prefix,
                     SCRIPT_ARG="POST-DEINSTALL",
                     pkgName=pkgName,
+                    **kwargs
                 )
 
     if pkgDeltaVersion is not None:
@@ -853,10 +863,10 @@ def install_file(pkgfile, dest):
     # Is this correct behaviour for delta packages?
     if upgrade_aware is False:
         RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_PRE_INSTALL,
-                     dest, PKG_PREFIX=prefix, pkgName=pkgName)
+                     dest, PKG_PREFIX=prefix, pkgName=pkgName, **kwargs)
         RunPkgScript(pkgScripts, PKG_SCRIPT_TYPES.PKG_SCRIPT_INSTALL,
                      dest, PKG_PREFIX=prefix, SCRIPT_ARG="PRE-INSTALL",
-                     pkgName=pkgName,
+                     pkgName=pkgName, **kwargs
                      )
 
     # Go through the tarfile, looking for entries in the manifest list.
@@ -905,6 +915,7 @@ def install_file(pkgfile, dest):
                      PKG_SCRIPT_TYPES.PKG_SCRIPT_POST_UPGRADE,
                      dest, PKG_PREFIX=prefix,
                      pkgName=pkgName,
+                     **kwargs
                      )
         RunPkgScript(
             pkgScripts,
@@ -913,6 +924,7 @@ def install_file(pkgfile, dest):
             PKG_PREFIX=prefix,
             SCRIPT_ARG="POST-UPGRADE",
             pkgName=pkgName,
+            **kwargs
         )
         if dest is None and pkgDeltaVersion is not None:
             RunPkgScript(
@@ -921,6 +933,7 @@ def install_file(pkgfile, dest):
                 dest,
                 PKG_PREFIX=prefix,
                 pkgName=pkgName,
+                **kwargs
             )
     else:
         RunPkgScript(pkgScripts,
@@ -928,6 +941,7 @@ def install_file(pkgfile, dest):
                      dest,
                      PKG_PREFIX=prefix,
                      pkgName=pkgName,
+                     **kwargs
         )
         RunPkgScript(
             pkgScripts,
@@ -935,7 +949,8 @@ def install_file(pkgfile, dest):
             dest,
             PKG_PREFIX=prefix,
             SCRIPT_ARG="POST-INSTALL",
-            pkgName=pkgName
+            pkgName=pkgName,
+            **kwargs
         )
     return True
 
@@ -945,7 +960,8 @@ class Installer(object):
     _conf = None
     _manifest = None
     _packages = []
-
+    _trampoline = True
+    
     def __init__(self, config=None, manifest=None, root=None):
         self._conf = config
         self._manifest = manifest
@@ -970,6 +986,13 @@ class Installer(object):
                         pkgfile.close()
             self._packages = []
 
+    @property
+    def trampoline(self):
+        return self._trampoline
+    @trampoline.setter
+    def trampoline(self, v):
+        self._trampoline = v
+        
     def SetRoot(self, root):
         self._root = root
         
@@ -1012,7 +1035,7 @@ class Installer(object):
                 log.debug("Installing package %s" % pkg)
                 if handler is not None:
                     handler(index=i + 1, name=pkgname, packages=self._packages)
-                if install_file(pkg[pkgname], self._root) is False:
+                if install_file(pkg[pkgname], self._root, trampoline=self.trampoline) is False:
                     log.error("Unable to install package %s" % pkgname)
                     return False
         return True
