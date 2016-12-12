@@ -616,7 +616,9 @@ class Configuration(object):
                           pathname=None, reason=None, intr_ok=False,
                           ignore_space=False):
         AVATAR_VERSION = "X-%s-Manifest-Version" % Avatar()
-        current_version = "unknown"
+        current_sequence = "unknown"
+        current_train = None
+        current_version = None
         host_id = None
         if file and url:
             log.debug("Cannot specify both file and url for TryGetNetworkFile")
@@ -635,7 +637,9 @@ class Configuration(object):
         log.debug("TryGetNetworkFile(%s)" % file_url)
         temp_mani = self.SystemManifest()
         if temp_mani:
-            current_version = temp_mani.Sequence()
+            current_sequence = temp_mani.Sequence()
+            current_version = temp_mani.Version()
+            current_train = temp_mani.Train()
         try:
             with open("/etc/hostid") as f:
                 host_id = f.read().rstrip()
@@ -677,7 +681,11 @@ class Configuration(object):
                     opener = build_opener(https_handler)
                     req = Request(url)
                     req.add_header("X-iXSystems-Project", Avatar())
-                    req.add_header("X-iXSystems-Version", current_version)
+                    req.add_header("X-iXSystems-Version", current_sequence)
+                    if current_version:
+                        req.add_header("X-iXSystems-Version-Name", current_version)
+                    if current_train:
+                        req.add_header("X-iXSystems-Train", current_train)
                     if host_id:
                         req.add_header("X-iXSystems-HostID", host_id)
                     if reason:
