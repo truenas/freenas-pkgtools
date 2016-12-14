@@ -1405,8 +1405,18 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False, ignore_spac
             )
         if "Restart" in changes:
             service_list = StopServices(changes["Restart"])
-    cl = FindClone(new_boot_name)
+    try:
+        cl = FindClone(new_boot_name)
+    except:
+        cl = None
     if cl is None:
+        if mount_point:
+            try:
+                UnmountClone(new_boot_name, mount_point)
+                DeleteClone(new_boot_name)
+            except:
+                log.debug("Got an exception while trying to clean up after FindClone", exc_info=True)
+                
         s = "Unable to find BE %s just after creation" % new_boot_name
         log.debug(s)
         raise UpdateBootEnvironmentException(s)
