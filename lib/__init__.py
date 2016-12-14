@@ -167,6 +167,7 @@ class StartsWithFilter(logging.Filter):
             allow = True
         return allow
 
+
 test_logger = logging.getLogger(__name__)
 
 log_config_dict = {
@@ -198,15 +199,6 @@ log_config_dict = {
     }
 }
 
-if not hasHandlers(test_logger):
-    log_config_dict['loggers'] = {
-        '': {
-            'handlers': ['syslog'],
-            'level': 'DEBUG',
-            'propagate': True
-        }
-    }
-
 
 def disable_trygetfilelogs():
     update_log_filter = StartsWithFilter(
@@ -232,4 +224,13 @@ def log_to_handler(specified_handler):
     }
     logging.config.dictConfig(log_config_dict)
 
-logging.config.dictConfig(log_config_dict)
+
+if not hasHandlers(test_logger):
+    log_config_dict['loggers'] = {
+        '': {
+            'handlers': ['syslog'],
+            'level': 'DEBUG',
+            'propagate': True
+        }
+    }
+    logging.config.dictConfig(log_config_dict)
