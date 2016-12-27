@@ -41,7 +41,7 @@ VERIFY_SKIP_PATHS = [
     '/usr/local/share/smartmontools/drivedb.h',
     '/boot/device.hints',
     '/usr/local/lib/perl5/5.16/man/whatis',
-    '/usr/share/man/whatis'
+    '/usr/share/man'
 ]
 CONFIG_DEFAULT = "Defaults"
 CONFIG_SEARCH = "Search"
