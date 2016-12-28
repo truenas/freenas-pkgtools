@@ -15,6 +15,37 @@ import freenasOS.Update as Update
 import freenasOS.Exceptions as Exceptions
 from freenasOS import log_to_handler
 
+class ProgressHandler(object):
+    def __init__(self):
+        self.percent = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
+    
+    def update(self, **kwargs):
+        total = kwargs.pop("total", 0)
+        index = kwargs.pop("index", 0)
+        name = kwargs.pop("name", None)
+        done = kwargs.pop("done", False)
+        if done:
+            if self.percent < 100:
+                print("100")
+            else:
+                print("")
+            self.percent = 0
+        elif total:
+            cur_pct = int((index * 100) / total)
+#            print("index={}, total={}, self.percent={}, cur_pct={}".format(index, total, self.percent, cur_pct))
+            if cur_pct > self.percent:
+                self.percent = cur_pct
+                if self.percent % 10 == 0:
+                    print("{}".format(self.percent), end="")
+                elif self.percent % 2 == 0:
+                    print(".", end="")
+                sys.stdout.flush()
 
 class ProgressBar(object):
     def __init__(self):
@@ -265,7 +296,9 @@ def DoUpdate(cache_dir, verbose, ignore_space=False):
                 if rv is False:
                     progress_bar.update(message="Updates were not applied")
         else:
-            rv = Update.ApplyUpdate(cache_dir, ignore_space=ignore_space)
+            with ProgressHandler() as pf:
+                  rv = Update.ApplyUpdate(cache_dir, progressFunc=pf.update, ignore_space=ignore_space)
+                  
     except Exceptions.UpdateInsufficientSpace as e:
         log.error(str(e))
         print(e.value if e.value else "Insufficient space for update")

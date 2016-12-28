@@ -630,7 +630,8 @@ def install_file(pkgfile, dest, **kwargs):
     pkgdb = Configuration.PackageDB(dest)
     pkgScripts = None
     upgrade_aware = False
-
+    progress = kwargs.pop("progress", lambda **kwargs: True)
+    
     try:
         t = tarfile.open(fileobj=pkgfile)
     except Exception as err:
@@ -871,6 +872,7 @@ def install_file(pkgfile, dest, **kwargs):
 
     # Go through the tarfile, looking for entries in the manifest list.
     pkgFiles = []
+    progress_count = 0
     while member is not None:
         # To figure out the hash, we need to look
         # at <file>, <prefix + file>, and both of those
@@ -902,7 +904,9 @@ def install_file(pkgfile, dest, **kwargs):
         list = ExtractEntry(t, member, dest, prefix, mFileHash)
         if list is not None:
             pkgFiles.append((pkgName,) + list)
-
+        progress_count += 1
+        progress(index=progress_count, total=len(mfiles)+len(mdirs), name=member.name)
+            
         member = t.next()
 
     t.close()
@@ -952,6 +956,7 @@ def install_file(pkgfile, dest, **kwargs):
             pkgName=pkgName,
             **kwargs
         )
+    progress(done=True)
     return True
 
 
@@ -1035,7 +1040,9 @@ class Installer(object):
                 log.debug("Installing package %s" % pkg)
                 if handler is not None:
                     handler(index=i + 1, name=pkgname, packages=self._packages)
-                if install_file(pkg[pkgname], self._root, trampoline=self.trampoline) is False:
+                if install_file(pkg[pkgname], self._root,
+                                progress=progressFunc,
+                                trampoline=self.trampoline) is False:
                     log.error("Unable to install package %s" % pkgname)
                     return False
         return True
