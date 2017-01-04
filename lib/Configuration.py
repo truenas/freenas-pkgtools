@@ -263,7 +263,7 @@ class PackageDB:
                 return self.__conn.cursor()
             return True
         try:
-            conn = sqlite3.connect(self.__db_path)
+            conn = sqlite3.connect(self.__db_path, isolation_level=None)
         except Exception as err:
             log.error(
                 "%s:  Cannot connect to database %s: %s",
