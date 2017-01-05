@@ -630,7 +630,9 @@ def install_file(pkgfile, dest, **kwargs):
     pkgdb = Configuration.PackageDB(dest)
     pkgScripts = None
     upgrade_aware = False
-    progress = kwargs.pop("progress", lambda **kwargs: True)
+    progress = kwargs.pop("progress", None)
+    if progress is None:
+        progress = lambda **kwargs: True
     
     try:
         t = tarfile.open(fileobj=pkgfile)
@@ -959,6 +961,42 @@ def install_file(pkgfile, dest, **kwargs):
     progress(done=True)
     return True
 
+class ProgressHandler(object):
+    def __init__(self):
+        self.percent = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
+    
+    def update(self, **kwargs):
+        total = kwargs.pop("total", 0)
+        index = kwargs.pop("index", 0)
+        name = kwargs.pop("name", None)
+        done = kwargs.pop("done", False)
+        if done:
+            if self.percent < 100:
+                print("100")
+            else:
+                print("")
+            self.percent = 0
+        elif total:
+            cur_pct = int((index * 100) / total)
+#            print("index={}, total={}, self.percent={}, cur_pct={}".format(index, total, self.percent, cur_pct))
+            if cur_pct > self.percent:
+                self.percent = cur_pct
+                if total < 20:
+                    if self.percent == 100:
+                        print("100")
+                    else:
+                        print(".", end="")
+                elif self.percent % 10 == 0:
+                    print("{}".format(self.percent), end="")
+                elif self.percent % 2 == 0:
+                    print(".", end="")
+                sys.stdout.flush()
 
 class Installer(object):
     _root = None

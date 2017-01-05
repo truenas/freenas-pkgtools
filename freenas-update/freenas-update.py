@@ -14,38 +14,7 @@ import freenasOS.Configuration as Configuration
 import freenasOS.Update as Update
 import freenasOS.Exceptions as Exceptions
 from freenasOS import log_to_handler
-
-class ProgressHandler(object):
-    def __init__(self):
-        self.percent = 0
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        pass
-    
-    def update(self, **kwargs):
-        total = kwargs.pop("total", 0)
-        index = kwargs.pop("index", 0)
-        name = kwargs.pop("name", None)
-        done = kwargs.pop("done", False)
-        if done:
-            if self.percent < 100:
-                print("100")
-            else:
-                print("")
-            self.percent = 0
-        elif total:
-            cur_pct = int((index * 100) / total)
-#            print("index={}, total={}, self.percent={}, cur_pct={}".format(index, total, self.percent, cur_pct))
-            if cur_pct > self.percent:
-                self.percent = cur_pct
-                if self.percent % 10 == 0:
-                    print("{}".format(self.percent), end="")
-                elif self.percent % 2 == 0:
-                    print(".", end="")
-                sys.stdout.flush()
+from freenasOS.Installer import ProgressHandler
 
 class ProgressBar(object):
     def __init__(self):
