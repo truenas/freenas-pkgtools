@@ -208,7 +208,7 @@ class Manifest(object):
     def __init__(self, configuration=None, require_signature=False):
         if configuration is None:
             from . import Configuration
-            self._config = Configuration.Configuration()
+            self._config = Configuration.SystemConfiguration()
         else:
             self._config = configuration
         self._requireSignature = require_signature

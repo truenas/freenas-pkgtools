@@ -971,7 +971,7 @@ class Installer(object):
         if self._conf is None:
             # Get the system configuration
             from . import Configuration
-            self._conf = Configuration.Configuration()
+            self._conf = Configuration.SystemConfiguration()
         if self._manifest is None:
             self._manifest = self._conf.SystemManifest()
         if self._manifest is None:

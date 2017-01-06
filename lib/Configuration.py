@@ -631,11 +631,12 @@ class Configuration(object):
     def ListUpdateServers(self):
         return list(self._update_servers.keys())
     
-    def SetUpdateServer(self, name=default_update_server.name):
+    def SetUpdateServer(self, name=default_update_server.name, save=True):
         if name not in self._update_servers:
             raise LookupError("Update server {} not found".format(name))
         self._update_server_name = name
-        self.StoreUpdateConfigurationFile(self._config_path)
+        if save:
+            self.StoreUpdateConfigurationFile(self._config_path)
         
     def AddUpdateServer(self, server):
         if server is None:
@@ -1317,7 +1318,12 @@ class Configuration(object):
             raise pkg_exception
         raise Exceptions.UpdatePackageNotFound(package.Name())
 
-
+_system_config = None
+def SystemConfiguration():
+    global _system_config
+    if _system_config is None:
+        _system_config = Configuration()
+    return _system_config
 
 def is_ignore_path(path):
     for i in VERIFY_SKIP_PATHS:
