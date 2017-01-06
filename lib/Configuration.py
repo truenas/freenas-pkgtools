@@ -534,11 +534,26 @@ class UpdateServer(object):
             self._name = name
         if url is None:
             raise ValueError("Cannot initialize UpdateServer with no URL")
-        else:
-            self._url = url
+        self._url = url
         self._master = master
+        if master == url:
+            self._master = None
         self._signature_required = signing
 
+    def __repr__(self):
+        return "UpdateServer(name={}, url={}, master={}, signing={})".format(
+            self.name, self.url, self.master, self.signature_required)
+
+    def __str__(self):
+        return "<UpdateServe name={} url={} master={} signing={}>".format(
+            self.name, self.url, self._master, self.signature_required)
+    
+    def __dict__(self):
+        retval = { "name" : self.name, "url" : self.url, "signing" : self.signature_required }
+        if self._master and self._master != self.url:
+            retval["master"] = self.master
+        return retval
+    
     @property
     def master(self):
         if self._master:
@@ -594,24 +609,55 @@ class Configuration(object):
             self._root = root
         if file is not None:
             self._config_path = file
-        self._update_server = default_update_server
-        self.LoadConfigurationFile(self._config_path)
+        self._update_servers = { default_update_server.name : default_update_server }
+        self._update_server_name = default_update_server.name
+        self.LoadUpdateConfigurationFile(self._config_path)
         # Set _temp to the system pool, if it exists.
         if os.path.exists(self._system_dataset):
             self._temp = self._system_dataset
 
     def UpdateServerMaster(self):
-        return self._update_server.master
+        return self._update_servers[self._update_server_name].master
 
     def UpdateServerURL(self):
-        return self._update_server.url
+        return self._update_servers[self._update_server_name].url
 
     def UpdateServerName(self):
-        return self._update_server.name
+        return self._update_servers[self._update_server_name].name
 
     def UpdateServerSigned(self):
-        return self._update_server.signature_required
+        return self._update_servers[self._update_server_name].signature_required
 
+    def ListUpdateServers(self):
+        return list(self._update_servers.keys())
+    
+    def SetUpdateServer(self, name=default_update_server.name):
+        if name not in self._update_servers:
+            raise LookupError("Update server {} not found".format(name))
+        self._update_server_name = name
+        self.StoreUpdateConfigurationFile(self._config_path)
+        
+    def AddUpdateServer(self, server):
+        if server is None:
+            raise ValueError("Cannot set an empty update server")
+        if server.name == default_update_server.name:
+            return
+        self._update_servers[server.name] = server
+        self.StoreUpdateConfigurationFile(self._config_path)
+        
+    def RemoveUpdateServer(self, name):
+        if name is None:
+            raise ValueError("Cannot remove None from update server list")
+        if name == default_update_server.name:
+            # Can't delete it, but we'll ignore it for now
+            return
+        if name not in self._update_servers:
+            raise LookupError("Cannot remove update server {} because it doesn't exist".format(name))
+        self._update_servers.pop(name, None)
+        if self._update_server_name == name:
+            self._update_server_name = default_update_server.name
+        self.StoreUpdateConfigurationFile(self._config_path)
+        
     def TryGetNetworkFile(self, file=None, url=None, handler=None,
                           pathname=None, reason=None, intr_ok=False,
                           ignore_space=False):
@@ -874,7 +920,30 @@ class Configuration(object):
             root = self._root
         return PackageDB(root, create)
 
-    def LoadConfigurationFile(self, path):
+    def StoreUpdateConfigurationFile(self, path):
+        cfp = configparser.SafeConfigParser()
+        if os.path.islink(self._root + path):
+            os.remove(self._root + path)
+
+        config_file = open(self._root + path, "w")
+
+        if self._update_server_name != default_update_server.name:
+            # We are using a different one
+            cfp.add_section(CONFIG_DEFAULT)
+            cfp.set(CONFIG_DEFAULT, CONFIG_SERVER, self._update_server_name)
+        for name, server in self._update_servers.items():
+            if name == default_update_server.name:
+                # We don't write this one out
+                continue
+            cfp.add_section(name)
+            for k, v in server.__dict__().items():
+                if v is not None:
+                    cfp.set(name, k, str(v))
+        cfp.write(config_file)
+        config_file.close()
+        return
+    
+    def LoadUpdateConfigurationFile(self, path):
         cfp = None
         try:
             with open(self._root + path, "r") as f:
@@ -890,11 +959,10 @@ class Configuration(object):
         for section in cfp.sections():
             if section == CONFIG_DEFAULT:
                 if cfp.has_option(CONFIG_DEFAULT, CONFIG_SERVER):
-                    upd = cfp.get(CONFIG_DEFAULT, CONFIG_SERVER)
+                    self._update_server_name = cfp.get(CONFIG_DEFAULT, CONFIG_SERVER)
             else:
                 if cfp.has_option(section, UPDATE_SERVER_NAME_KEY) and \
-                   cfp.has_option(section, UPDATE_SERVER_URL_KEY) and \
-                   section == upd:
+                   cfp.has_option(section, UPDATE_SERVER_URL_KEY):
                     # This is an update server section
                     n = cfp.get(section, UPDATE_SERVER_NAME_KEY)
                     u = cfp.get(section, UPDATE_SERVER_URL_KEY)
@@ -904,10 +972,13 @@ class Configuration(object):
                         if cfp.has_option(section, UPDATE_SERVER_MASTER_KEY) else None
                     try:
                         update_server = UpdateServer(name=n, url=u, signing=s, master=m)
-                        self._update_server = update_server
+                        self._update_servers[update_server.name] = update_server
                     except:
                         log.error("Cannot set update server to %s, using default", n)
         # End for loop here
+        if self._update_server_name not in self._update_servers:
+            log.error("Selected update server is not in list of update servers, using default")
+            self._update_server_name = default_update_server.name
         return
 
     def SetPackageDir(self, loc):
