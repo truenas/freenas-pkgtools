@@ -319,20 +319,34 @@ def CloneSetAttr(clone, **kwargs):
     if kwargs is None:
         return True
 
-    if "keep" in kwargs:
-        # This maps to zfs set beadm:keep=%s freenas-boot/ROOT/${bename}
-        tval = bool(kwargs["keep"])
-        try:
-            ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(clone["realname"]))
-            if "beadm:keep" in ds.properties:
-                ds.properties["beadm:keep"].value = str(tval)
-            else:
-                ds.properties["beadm:keep"] = libzfs.ZFSUserProperty(str(tval))
-        except:
-            log.debug("Unable to set beadm:keep value on BE {0}".format(clone["realname"]), exc_info=True)
-        return True
-    return False
-
+    try:
+        ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(clone["realname"]))
+    except:
+        log.debug("Unable to find BE {0}".format(clone["realname"]), exc_info=True)
+        return False
+    
+    for k, v in kwargs.items():
+        if k == "keep":
+            # This maps to zfs set beadm:keep=%s freenas-boot/ROOT/${bename}
+            try:
+                if "beadm:keep" in ds.properties:
+                    ds.properties["beadm:keep"].value = str(v)
+                else:
+                    ds.properties["beadm:keep"] = libzfs.ZFSUserProperty(str(v))
+            except:
+                log.debug("Unable to set beadm:keep value on BE {0}".format(clone["realname"]), exc_info=True)
+                return False
+        elif k == "sync":
+            try:
+                if v is None:
+                    ds.properties["sync"].inherit()
+                else:
+                    ds.properties["sync"].value = v
+            except:
+                log.debug("Unable to set dataset sync value on BE {0} to {1}".
+                          format(clone["realname"], str(v)), exc_info=True)
+                return False
+    return True
 
 def PruneClones(cb=None, required=0):
     """
@@ -1421,7 +1435,7 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False, ignore_spac
         log.debug(s)
         raise UpdateBootEnvironmentException(s)
     else:
-        if not CloneSetAttr(cl, keep=False):
+        if not CloneSetAttr(cl, keep=False, sync="disabled"):
             s = "Unable to set keep attribute on BE %s" % new_boot_name
             log.debug(s)
             
@@ -1456,6 +1470,9 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False, ignore_spac
         else:
             new_manifest.Save(mount_point)
             if mount_point:
+                if not CloneSetAttr(cl, sync=None):
+                    log.debug("Unable to clear sync on BE {}".format(cl["realname"]))
+
                 if UnmountClone(new_boot_name, mount_point) is False:
                     s = "Unable to unmount clone environment %s from mount point %s" % (new_boot_name, mount_point)
                     log.error(s)
