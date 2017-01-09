@@ -1198,7 +1198,12 @@ def ServiceRestarts(directory):
     return retval
 
 
-def ApplyUpdate(directory, install_handler=None, force_reboot=False, ignore_space=False):
+def ApplyUpdate(directory,
+                install_handler=None,
+                force_reboot=False,
+                ignore_space=False,
+                progressFunc=None
+                ):
     """
     Apply the update in <directory>.  As with PendingUpdates(), it will
     have to verify the contents before it actually installs them, so
@@ -1464,7 +1469,7 @@ def ApplyUpdate(directory, install_handler=None, force_reboot=False, ignore_spac
 
         # Now to start installing the packages
         rv = False
-        if installer.InstallPackages(handler=install_handler) is False:
+        if installer.InstallPackages(progressFunc=progressFunc, handler=install_handler) is False:
             log.error("Unable to install packages")
             raise UpdatePackageException("Unable to install packages")
         else:

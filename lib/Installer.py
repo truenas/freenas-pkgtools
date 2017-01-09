@@ -630,7 +630,10 @@ def install_file(pkgfile, dest, **kwargs):
     pkgdb = Configuration.PackageDB(dest)
     pkgScripts = None
     upgrade_aware = False
-
+    progress = kwargs.pop("progress", None)
+    if progress is None:
+        progress = lambda **kwargs: True
+    
     try:
         t = tarfile.open(fileobj=pkgfile)
     except Exception as err:
@@ -871,6 +874,7 @@ def install_file(pkgfile, dest, **kwargs):
 
     # Go through the tarfile, looking for entries in the manifest list.
     pkgFiles = []
+    progress_count = 0
     while member is not None:
         # To figure out the hash, we need to look
         # at <file>, <prefix + file>, and both of those
@@ -902,7 +906,9 @@ def install_file(pkgfile, dest, **kwargs):
         list = ExtractEntry(t, member, dest, prefix, mFileHash)
         if list is not None:
             pkgFiles.append((pkgName,) + list)
-
+        progress_count += 1
+        progress(index=progress_count, total=len(mfiles)+len(mdirs), name=member.name)
+            
         member = t.next()
 
     t.close()
@@ -952,8 +958,45 @@ def install_file(pkgfile, dest, **kwargs):
             pkgName=pkgName,
             **kwargs
         )
+    progress(done=True)
     return True
 
+class ProgressHandler(object):
+    def __init__(self):
+        self.percent = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
+    
+    def update(self, **kwargs):
+        total = kwargs.pop("total", 0)
+        index = kwargs.pop("index", 0)
+        name = kwargs.pop("name", None)
+        done = kwargs.pop("done", False)
+        if done:
+            if self.percent < 100:
+                print("100")
+            else:
+                print("")
+            self.percent = 0
+        elif total:
+            cur_pct = int((index * 100) / total)
+#            print("index={}, total={}, self.percent={}, cur_pct={}".format(index, total, self.percent, cur_pct))
+            if cur_pct > self.percent:
+                self.percent = cur_pct
+                if total < 20:
+                    if self.percent == 100:
+                        print("100")
+                    else:
+                        print(".", end="")
+                elif self.percent % 10 == 0:
+                    print("{}".format(self.percent), end="")
+                elif self.percent % 2 == 0:
+                    print(".", end="")
+                sys.stdout.flush()
 
 class Installer(object):
     _root = None
@@ -1035,7 +1078,9 @@ class Installer(object):
                 log.debug("Installing package %s" % pkg)
                 if handler is not None:
                     handler(index=i + 1, name=pkgname, packages=self._packages)
-                if install_file(pkg[pkgname], self._root, trampoline=self.trampoline) is False:
+                if install_file(pkg[pkgname], self._root,
+                                progress=progressFunc,
+                                trampoline=self.trampoline) is False:
                     log.error("Unable to install package %s" % pkgname)
                     return False
         return True

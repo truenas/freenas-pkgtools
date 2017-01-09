@@ -14,7 +14,7 @@ import freenasOS.Configuration as Configuration
 import freenasOS.Update as Update
 import freenasOS.Exceptions as Exceptions
 from freenasOS import log_to_handler
-
+from freenasOS.Installer import ProgressHandler
 
 class ProgressBar(object):
     def __init__(self):
@@ -265,7 +265,9 @@ def DoUpdate(cache_dir, verbose, ignore_space=False):
                 if rv is False:
                     progress_bar.update(message="Updates were not applied")
         else:
-            rv = Update.ApplyUpdate(cache_dir, ignore_space=ignore_space)
+            with ProgressHandler() as pf:
+                  rv = Update.ApplyUpdate(cache_dir, progressFunc=pf.update, ignore_space=ignore_space)
+                  
     except Exceptions.UpdateInsufficientSpace as e:
         log.error(str(e))
         print(e.value if e.value else "Insufficient space for update")
