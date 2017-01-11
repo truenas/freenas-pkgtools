@@ -833,7 +833,7 @@ def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None)
     use the manifest in that directory.
     """
 
-    conf = Configuration.Configuration()
+    conf = Configuration.SystemConfiguration()
     new_manifest = None
     mfile = None
     if cache_dir:
@@ -912,7 +912,7 @@ def DownloadUpdate(train, directory, get_handler=None,
     Raises exceptions on errors.
     """
 
-    conf = Configuration.Configuration()
+    conf = Configuration.SystemConfiguration()
     mani = conf.SystemManifest()
     # First thing, let's get the latest manifest
     try:
@@ -1115,7 +1115,7 @@ def PendingUpdatesChanges(directory):
     number does not match the current system's sequence.
     """
     mani_file = None
-    conf = Configuration.Configuration()
+    conf = Configuration.SystemConfiguration()
     try:
         mani_file = VerifyUpdate(directory)
     except UpdateBusyCacheException:
@@ -1210,7 +1210,7 @@ def ApplyUpdate(directory,
     it has the same behaviour with incomplete or invalid content.
     """
     rv = False
-    conf = Configuration.Configuration()
+    conf = Configuration.SystemConfiguration()
     # Note that PendingUpdates may raise an exception
     changes = PendingUpdatesChanges(directory)
 
@@ -1555,7 +1555,7 @@ def VerifyUpdate(directory):
 
     # First thing we do is get the systen configuration and
     # systen manifest
-    conf = Configuration.Configuration()
+    conf = Configuration.SystemConfiguration()
     mani = conf.SystemManifest()
 
     # Next, let's see if the directory exists.

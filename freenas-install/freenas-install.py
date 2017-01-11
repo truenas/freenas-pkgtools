@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     root = args[0]
 
-    config = Configuration.Configuration()
+    config = Configuration.SystemConfiguration()
     if package_dir is not None:
         config.SetPackageDir(package_dir)
 

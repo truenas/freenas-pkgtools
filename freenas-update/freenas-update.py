@@ -284,7 +284,7 @@ def main():
     global log
 
     def usage():
-        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [--force|-F] [-v] <cmd>
+        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [--server|-S server][--force|-F] [-v] <cmd>
 or	{0} <update_tar_file>
 where cmd is one of:
         check\tCheck for updates
@@ -292,7 +292,7 @@ where cmd is one of:
         sys.exit(1)
 
     try:
-        short_opts = "C:dRT:vF"
+        short_opts = "C:dFRS:T:v"
         long_opts = [
             "cache=",
             "debug",
@@ -301,6 +301,7 @@ where cmd is one of:
             "verbose",
             "no-delta",
             "force",
+            "server=",
             "snl"
         ]
         opts, args = getopt.getopt(sys.argv[1:], short_opts, long_opts)
@@ -318,6 +319,7 @@ where cmd is one of:
     pkg_type = None
     snl = False
     force = False
+    server = None
     
     for o, a in opts:
         if o in ("-v", "--verbose"):
@@ -328,6 +330,8 @@ where cmd is one of:
             cache_dir = a
         elif o in ("-R", "--reboot"):
             do_reboot = True
+        elif o in ("-S", "--server"):
+            server = a
         elif o in ("-T", "--train"):
             train = a
         elif o in ("--no-delta"):
@@ -343,7 +347,11 @@ where cmd is one of:
         log_to_handler('stderr')
     log = logging.getLogger('freenas-update')
 
-    config = Configuration.Configuration()
+    config = Configuration.SystemConfiguration()
+    if server:
+        assert server in config.ListUpdateServers(), "Unknown update server {}".format(server)
+        config.SetUpdateServer(server, save=False)
+        
     if train is None:
         train = config.SystemManifest().Train()
 
