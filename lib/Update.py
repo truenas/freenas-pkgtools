@@ -1202,7 +1202,8 @@ def ApplyUpdate(directory,
                 install_handler=None,
                 force_reboot=False,
                 ignore_space=False,
-                progressFunc=None
+                progressFunc=None,
+                force_trampoline=None
                 ):
     """
     Apply the update in <directory>.  As with PendingUpdates(), it will
@@ -1272,6 +1273,10 @@ def ApplyUpdate(directory,
         manifest=new_manifest,
         config=conf
     )
+    if force_trampoline is not None:
+        log.debug("ApplyUpdate: force_trampoline = {} (bool {})".format(force_trampoline, bool(force_trampoline)))
+        installer.trampoline = bool(force_trampoline)
+
     installer.GetPackages(pkgList=updated_packages)
     log.debug("Installer got packages %s" % installer.Packages())
     

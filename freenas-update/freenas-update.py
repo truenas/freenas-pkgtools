@@ -227,7 +227,7 @@ def DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=False):
     return rv
 
 
-def DoUpdate(cache_dir, verbose, ignore_space=False):
+def DoUpdate(cache_dir, verbose, ignore_space=False, force_trampoline=None):
     """
     Common code to apply an update once it's been downloaded.
     This will handle all of the exceptions in a common fashion.
@@ -260,13 +260,18 @@ def DoUpdate(cache_dir, verbose, ignore_space=False):
                 rv = Update.ApplyUpdate(
                     cache_dir,
                     install_handler=handler.install_handler,
-                    ignore_space=ignore_space
+                    ignore_space=ignore_space,
+                    force_trampoline=force_trampoline,
                 )
                 if rv is False:
                     progress_bar.update(message="Updates were not applied")
         else:
             with ProgressHandler() as pf:
-                  rv = Update.ApplyUpdate(cache_dir, progressFunc=pf.update, ignore_space=ignore_space)
+                  rv = Update.ApplyUpdate(cache_dir,
+                                          progressFunc=pf.update,
+                                          ignore_space=ignore_space,
+                                          force_trampoline=force_trampoline,
+                                          )
                   
     except Exceptions.UpdateInsufficientSpace as e:
         log.error(str(e))
@@ -284,7 +289,7 @@ def main():
     global log
 
     def usage():
-        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [--server|-S server][--force|-F] [-v] <cmd>
+        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [--server|-S server][-B|--trampline yes|no] [--force|-F] [-v] <cmd>
 or	{0} <update_tar_file>
 where cmd is one of:
         check\tCheck for updates
@@ -292,7 +297,7 @@ where cmd is one of:
         sys.exit(1)
 
     try:
-        short_opts = "C:dFRS:T:v"
+        short_opts = "B:C:dFRS:T:v"
         long_opts = [
             "cache=",
             "debug",
@@ -302,6 +307,7 @@ where cmd is one of:
             "no-delta",
             "force",
             "server=",
+            "trampoline=",
             "snl"
         ]
         opts, args = getopt.getopt(sys.argv[1:], short_opts, long_opts)
@@ -320,6 +326,7 @@ where cmd is one of:
     snl = False
     force = False
     server = None
+    force_trampoline = None
     
     for o, a in opts:
         if o in ("-v", "--verbose"):
@@ -336,6 +343,14 @@ where cmd is one of:
             train = a
         elif o in ("--no-delta"):
             pkg_type = Update.PkgFileFullOnly
+        elif o in ("-B", "--trampoline"):
+            if a in ("true", "True", "yes", "YES", "Yes"):
+                force_trampoline = True
+            elif a in ("false", "False", "no", "NO", "No"):
+                force_trampoline = False
+            else:
+                print("Trampoline option must be boolean [yes/no]", file=sys.stderr)
+                usage()
         elif o in ("--snl"):
             snl = True
         elif o in ("-F", "--force"):
@@ -414,7 +429,7 @@ where cmd is one of:
                 sys.exit(1)
 
         try:
-            rv = DoUpdate(cache_dir, verbose, ignore_space=force)
+            rv = DoUpdate(cache_dir, verbose, ignore_space=force, force_trampoline=force_trampoline)
         except:
             sys.exit(1)
         else:
@@ -460,7 +475,7 @@ where cmd is one of:
             s.write(config.UpdateServerName())
 
         try:
-            rv = DoUpdate(cache_dir, verbose, ignore_space=force)
+            rv = DoUpdate(cache_dir, verbose, ignore_space=force, force_trampoline=force_trampoline)
         except:
             sys.exit(1)
         else:
