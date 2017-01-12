@@ -973,7 +973,7 @@ class Configuration(object):
                         if cfp.has_option(section, UPDATE_SERVER_MASTER_KEY) else None
                     try:
                         update_server = UpdateServer(name=n, url=u, signing=s, master=m)
-                        self._update_servers[update_server.name] = update_server
+                        self._update_servers[section] = update_server
                     except:
                         log.error("Cannot set update server to %s, using default", n)
         # End for loop here
