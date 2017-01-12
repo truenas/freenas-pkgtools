@@ -922,7 +922,7 @@ class Configuration(object):
         return PackageDB(root, create)
 
     def StoreUpdateConfigurationFile(self, path):
-        cfp = configparser.SafeConfigParser()
+        cfp = configparser.ConfigParser()
         if os.path.islink(self._root + path):
             os.remove(self._root + path)
 
