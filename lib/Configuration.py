@@ -688,8 +688,8 @@ class Configuration(object):
             current_version = temp_mani.Version()
             current_train = temp_mani.Train()
         try:
-            with open("/etc/hostid") as f:
-                host_id = f.read().rstrip()
+            from bsd.sysctl import sysctlbyname
+            host_id = sysctlbyname("kern.hostuuid").strip('\x00')
         except:
             host_id = None
 
