@@ -2,6 +2,7 @@ from __future__ import print_function
 import os
 import json
 import logging
+import re
 
 from . import Exceptions, Package
 
@@ -409,18 +410,31 @@ class Manifest(object):
         else:
             import subprocess
             import tempfile
-
+            from base64 import b64decode
+            import OpenSSL.crypto as Crypto
             try:
                 cert_file = VerificationCertificateFile(self)
             except ValueError:
                 cert_file = None
                 
-            if not os.path.isfile(IX_ROOT_CA_FILE) or \
-               not os.path.isfile(cert_file) or \
-               not os.path.isfile(VERIFIER_HELPER):
+            if not os.path.isfile(IX_ROOT_CA_FILE) \
+               or cert_file is None \
+               or not os.path.isfile(cert_file):
                 log.debug("VerifySignature:  Cannot find a required file")
                 return False
 
+            # First we create a store
+            store = Crypto.X509Store()
+            store.set_flags(Crypto.X509StoreFlags.CRL_CHECK)
+            # Load our root CA
+            try:
+                with open(IX_ROOT_CA_FILE, "r") as f:
+                    root_ca = Crypto.load_certificate(Crypto.FILETYPE_PEM, f.read())
+                    store.add_cert(root_ca)
+            except:
+                log.debug("VerifySignature:  Could not load iX root CA", exc_info=True)
+                return False
+                
             # Now need to get the CRL
             crl_file = tempfile.NamedTemporaryFile(suffix=".pem")
             if crl_file is None:
@@ -435,43 +449,45 @@ class Manifest(object):
                     crl_file.close()
                     crl_file = None
 
-            tdata = None
-            verify_cmd = [VERIFIER_HELPER,
-                          "-K", cert_file,
-                          "-C", IX_ROOT_CA_FILE,
-                          "-S", self.Signature()]
             if crl_file:
-                verify_cmd.extend(["-R", crl_file.name])
-            else:
-                log.debug("Could not get CRL %s, so we'll just continue" % IX_CRL)
-
-            log.debug("Verify command = %s" % verify_cmd)
-
-            temp = self.dict().copy()
-            temp.pop(SIGNATURE_KEY, None)
-            canonical = MakeString(temp)
-            if len(canonical) < 10 * 1024:
-                # I think we can have 10k arguments in freebsd
-                verify_cmd.append(canonical)
-            else:
-                tdata = tempfile.NamedTemporaryFile()
-                tdata.write(canonical)
-                verify_cmd.extend(["-D", tdata.name])
-
-            rv = False
+                try:
+                    crl = Crypto.load_crl(Crypto.FILETYPE_PEM, crl_file.read())
+                    store.add_crl(crl)
+                except:
+                    log.debug("Could not load CRL, ignoring for now", exc_info=True)
+                
+            # Now load the certificate files
             try:
-                subprocess.check_call(verify_cmd)
-                log.debug("Signature check succeeded")
-                rv = True
-            except subprocess.CalledProcessError as e:
-                rv = False
-                log.error("Signature check failed, exit value %d" % e.returncode)
+                with open(cert_file, "r") as f:
+                    regexp = r'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----'
+                    certs = re.findall(regexp, f.read(), re.DOTALL)
+            except:
+                log.error("Could not load certificates", exc_info=True)
+                return false
+                    
+            # Almost done:  we need the signature as binary data
+            try:
+                signature = b64decode(self.Signature())
+            except:
+                log.error("Could not decode signature", exc_info=True)
+                return False
+            
+            verified = False
+            tdata = self.dict().copy()
+            tdata.pop(SIGNATURE_KEY, None)
+            canonical = MakeString(tdata)
+            
+            for cert in certs:
+                try:
+                    test_cert = Crypto.load_certificate(Crypto.FILETYPE_PEM, cert)
+                    Crypto.verify(test_cert, signature, canonical, "sha256")
+                    verified = True
+                    break
+                except:
+                    # For now, just ignore
+                    pass
 
-            if tdata:
-                tdata.close()
-                os.remove(tdata.name)
-
-            return rv
+            return verified
         return False
 
     def Signature(self):
