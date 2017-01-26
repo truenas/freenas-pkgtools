@@ -948,8 +948,11 @@ class Configuration(object):
         cfp = None
         try:
             with open(self._root + path, "r") as f:
-                cfp = configparser.SafeConfigParser()
-                cfp.readfp(f)
+                cfp = configparser.ConfigParser()
+                if six.PY2:
+                    cfp.readfp(f)
+                elif six.PY3
+                    cfp.read_file(f)
         except:
             return
 
