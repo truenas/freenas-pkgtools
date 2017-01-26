@@ -951,7 +951,7 @@ class Configuration(object):
                 cfp = configparser.ConfigParser()
                 if six.PY2:
                     cfp.readfp(f)
-                elif six.PY3
+                elif six.PY3:
                     cfp.read_file(f)
         except:
             return
