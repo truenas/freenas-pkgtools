@@ -638,15 +638,16 @@ class Configuration(object):
         if save:
             self.StoreUpdateConfigurationFile(self._config_path)
         
-    def AddUpdateServer(self, server):
+    def AddUpdateServer(self, server, save=True):
         if server is None:
             raise ValueError("Cannot set an empty update server")
         if server.name == default_update_server.name:
             return
         self._update_servers[server.name] = server
-        self.StoreUpdateConfigurationFile(self._config_path)
+        if save:
+            self.StoreUpdateConfigurationFile(self._config_path)
         
-    def RemoveUpdateServer(self, name):
+    def RemoveUpdateServer(self, name, save=True):
         if name is None:
             raise ValueError("Cannot remove None from update server list")
         if name == default_update_server.name:
@@ -657,7 +658,8 @@ class Configuration(object):
         self._update_servers.pop(name, None)
         if self._update_server_name == name:
             self._update_server_name = default_update_server.name
-        self.StoreUpdateConfigurationFile(self._config_path)
+        if save:
+            self.StoreUpdateConfigurationFile(self._config_path)
         
     def TryGetNetworkFile(self, file=None, url=None, handler=None,
                           pathname=None, reason=None, intr_ok=False,

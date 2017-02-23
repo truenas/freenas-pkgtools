@@ -907,8 +907,10 @@ def install_file(pkgfile, dest, **kwargs):
         if list is not None:
             pkgFiles.append((pkgName,) + list)
         progress_count += 1
-        progress(index=progress_count, total=len(mfiles)+len(mdirs), name=member.name)
-            
+        try:
+            progress(index=progress_count, total=len(mfiles)+len(mdirs), name=member.name)
+        except:
+            log.debug("Got an exception calling the progress handler", exc_info=True)
         member = t.next()
 
     t.close()
@@ -958,7 +960,10 @@ def install_file(pkgfile, dest, **kwargs):
             pkgName=pkgName,
             **kwargs
         )
-    progress(done=True)
+    try:
+        progress(done=True)
+    except:
+        log.debug("Got an exception finishing up the progress handler", exc_info=True)
     return True
 
 class ProgressHandler(object):
