@@ -2,6 +2,7 @@ from __future__ import print_function
 import hashlib
 import logging
 import os
+import re
 import sys
 import tempfile
 import time
@@ -651,6 +652,10 @@ class Configuration(object):
             from freenasUI.support.utils import LICENSE_FILE
             with open(LICENSE_FILE, "r") as f:
                 license_data = f.read().rstrip()
+                # Make sure license data is a valid header (and base64 string)
+                # See #21179
+                if not re.search(r'^[a-z0-9\+\/]+[=]*$', license_data, re.I):
+                    license_data = None
         except:
             pass
 
