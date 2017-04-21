@@ -440,11 +440,15 @@ class Manifest(object):
             if crl_file is None:
                 log.debug("Could not create CRL, ignoring for now")
             else:
-                if not self._config.TryGetNetworkFile(
-                    url=IX_CRL,
-                    pathname=crl_file.name,
-                    reason="FetchCRL"
-                ):
+                try:
+                    if not self._config.TryGetNetworkFile(
+                            url=IX_CRL,
+                            pathname=crl_file.name,
+                            reason="FetchCRL"
+                    ):
+                        # TGNF will raise an exception in most cases.
+                        raise Exception("Could not get CRL file")
+                except:
                     log.error("Could not get CRL file %s" % IX_CRL)
                     crl_file.close()
                     crl_file = None
