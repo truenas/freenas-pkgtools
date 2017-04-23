@@ -257,14 +257,14 @@ class PackageDB:
         self._closedb()
         return
 
-    def _connectdb(self, returniferror=False, cursor=False):
+    def _connectdb(self, returniferror=False, cursor=Falsem, isolation_level=None):
         import sqlite3
         if self.__conn is not None:
             if cursor:
                 return self.__conn.cursor()
             return True
         try:
-            conn = sqlite3.connect(self.__db_path, isolation_level=None)
+            conn = sqlite3.connect(self.__db_path, isolation_level=isolation_level)
         except Exception as err:
             log.error(
                 "%s:  Cannot connect to database %s: %s",
@@ -390,7 +390,7 @@ class PackageDB:
         return rv
 
     def AddFilesBulk(self, list):
-        self._connectdb()
+        self._connectdb(isolation_level="DEFERRED")
         cur = self.__conn.cursor()
         stmt = "INSERT OR REPLACE INTO files(package, path, kind, checksum, uid, gid, flags, mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?)"
         cur.executemany(stmt, list)
