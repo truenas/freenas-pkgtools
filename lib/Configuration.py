@@ -257,7 +257,7 @@ class PackageDB:
         self._closedb()
         return
 
-    def _connectdb(self, returniferror=False, cursor=Falsem, isolation_level=None):
+    def _connectdb(self, returniferror=False, cursor=False, isolation_level=None):
         import sqlite3
         if self.__conn is not None:
             if cursor:
@@ -1134,7 +1134,7 @@ class Configuration(object):
             # This needs to change for TrueNAS, doesn't it?
             ManifestFile = "%s/%s-%s" % (Avatar(), train, sequence)
 
-        file_ref = self.TryGetNetworkFile(url="%s/%s" % (self.UpdateServerMaster(), ManifestFiles),
+        file_ref = self.TryGetNetworkFile(url="%s/%s" % (self.UpdateServerMaster(), ManifestFile),
                                           handler=handler,
                                           reason="GetManifest")
         return file_ref
