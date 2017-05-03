@@ -1227,6 +1227,9 @@ def ApplyUpdate(directory,
         log.error("Cached manifest has invalid signature: %s" % str(e))
         raise e
 
+    # Run the update validation, if any.  This may
+    # raise an exception.
+    new_manifest.RunValidationProgram(directory)
     conf.SetPackageDir(directory)
 
     # If we're here, then we have some change to make.
