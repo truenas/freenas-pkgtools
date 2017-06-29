@@ -979,6 +979,10 @@ class Configuration(object):
                 elif six.PY3:
                     cfp.read_file(f)
         except:
+            # If we don't have an update configuration file,
+            # we need to use the defaults, no matter what
+            # we've used before
+            self._update_server_name = default_update_server.name
             return
 
         if cfp is None:
