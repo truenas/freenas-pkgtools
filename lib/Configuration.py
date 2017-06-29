@@ -618,18 +618,23 @@ class Configuration(object):
             self._temp = self._system_dataset
 
     def UpdateServerMaster(self):
+        self.UpdateCache()
         return self._update_servers[self._update_server_name].master
 
     def UpdateServerURL(self):
+        self.UpdateCache()
         return self._update_servers[self._update_server_name].url
 
     def UpdateServerName(self):
+        self.UpdateCache()
         return self._update_servers[self._update_server_name].name
 
     def UpdateServerSigned(self):
+        self.UpdateCache()
         return self._update_servers[self._update_server_name].signature_required
 
     def ListUpdateServers(self):
+        self.UpdateCache()
         return list(self._update_servers.keys())
     
     def SetUpdateServer(self, name=default_update_server.name, save=True):
@@ -951,10 +956,23 @@ class Configuration(object):
         config_file.close()
         return
     
+    def UpdateCache(self):
+        """
+        Update the cached fields if necessary.  At this
+        point, this only means the update configuration file.
+        """
+        self.LoadUpdateConfigurationFile(self._config_path)
+        
     def LoadUpdateConfigurationFile(self, path):
         cfp = None
         try:
             with open(self._root + path, "r") as f:
+                mtime = os.stat(f.name).st_mtime
+                try:
+                    if mtime <= self._upd_conf_mtime:
+                        return
+                except:
+                    self._upd_conf_mtime = mtime
                 cfp = configparser.ConfigParser()
                 if six.PY2:
                     cfp.readfp(f)
