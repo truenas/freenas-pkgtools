@@ -719,13 +719,18 @@ def UnmountClone(name, mount_point=None):
 
 def DeleteClone(name, delete_grub=False):
     # Delete the clone we created.
+
     _CheckBEName(name)
     
-    args = ["destroy", "-F", name]
+    clone = FindClone(name)
+    if clone is None:
+        return False
+    
+    args = ["destroy", "-F", clone["realname"]]
     rv = RunCommand(beadm, args)
     if rv is False:
         return rv
-
+    
     if delete_grub:
         zfs = "/sbin/zfs"
         args = ["destroy", _grub_snapshot(name)]
