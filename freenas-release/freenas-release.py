@@ -1582,7 +1582,14 @@ def AddPackage(pkg, db = None,
             print("\tAdding update from %s" % base, file=sys.stderr)
             if archive:
                 delta_path = os.path.join(archive, "Packages", retval.FileName(base))
-                size = os.stat(delta_path).st_size
+                try:
+                    size = os.stat(delta_path).st_size
+                except OSError:
+                    # If the file doesn't exist, don't add this update.
+                    print("\tExpected delta package file for {} {}->{} does not exist, skipping".format(
+                        retval.Name(), base, retval.Version()),
+                          file=sys.stderr)
+                    continue
             else:
                 size = None
             upd = retval.AddUpdate(base,
@@ -3542,6 +3549,7 @@ or	{0} extract [--dest dest] [--tar] --train=TRAIN""".format(sys.argv[0]), file=
             sys.exit(1)
         shutil.rmtree(dest, ignore_errors=True)
         print(temp_dest)
+        os.popen("/sbin/sha256 -q {0} > {0}.sha256".format(temp_dest) )
     else:
         print(dest)
     
