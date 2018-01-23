@@ -240,14 +240,7 @@ def StartServices(svc_list):
 # Used by the clone functions below
 beadm = "/usr/local/sbin/beadm"
 dsinit = "/usr/local/sbin/dsinit"
-grub_dir = "/boot/grub"
-grub_cfg = "/boot/grub/grub.cfg"
 freenas_pool = "freenas-boot"
-
-
-def _grub_snapshot(name):
-    return "{0}/grub@Pre-Upgrade-{1}".format(freenas_pool, name)
-
 
 def RunCommand(command, args):
     # Run the given command.  Uses subprocess module.
@@ -641,36 +634,19 @@ def MountClone(name, mountpoint=None):
         return None
 
     # If all that worked... we now need
-    # to set up /dev, /var/tmp, and /boot/grub.
+    # to set up /dev, /var/tmp
     # Let's see if we need to do that
-    if os.path.exists(grub_cfg) is True:
-        if os.path.exists(mount_point + grub_cfg) is True:
-            # We had a brief bit of insanity
-            try:
-                os.remove(mount_point + grub_cfg)
-            except:
-                pass
-        # Okay, it needs to be mounted
-        # To mount the grub fs, however, we need to unmount
-        # it in root!  This is particularly annoying.
-        cmd = "/sbin/umount"
-        args = ["-f", grub_dir]
-        rv = RunCommand(cmd, args)
+    # Now let's mount devfs, tmpfs
+    args_array = [
+        ["-t", "devfs", "devfs", mount_point + "/dev"],
+        ["-t", "tmpfs", "tmpfs", mount_point + "/var/tmp"],
+    ]
+    cmd = "/sbin/mount"
+    for fs_args in args_array:
+        rv = RunCommand(cmd, fs_args)
         if rv is False:
             UnmountClone(name, None)
             return None
-        # Now let's mount devfs, tmpfs, and grub
-        args_array = [
-            ["-t", "devfs", "devfs", mount_point + "/dev"],
-            ["-t", "tmpfs", "tmpfs", mount_point + "/var/tmp"],
-            ["-t", "zfs", "freenas-boot/grub", mount_point + "/boot/grub"]
-        ]
-        cmd = "/sbin/mount"
-        for fs_args in args_array:
-            rv = RunCommand(cmd, fs_args)
-            if rv is False:
-                UnmountClone(name, None)
-                return None
 
     return mount_point
 
@@ -684,20 +660,9 @@ def ActivateClone(name):
 def UnmountClone(name, mount_point=None):
     # Unmount the given clone.  After unmounting,
     # it removes the mount directory.
-    # First thing we need to do is try to unmount
-    # the grub directory, and then remount it in its
-    # proper place.  Then we can unmount /dev and /var/tmp
+    # We can also unmount /dev and /var/tmp
     # If this fails, we ignore it for now
     if mount_point is not None:
-        cmd = "/sbin/umount"
-        args = ["-f", mount_point + grub_dir]
-        RunCommand(cmd, args)
-        cmd = "/sbin/mount"
-        args = ["/boot/grub"]
-        rv = RunCommand(cmd, args)
-        if rv is False:
-            log.error("UNABLE TO MOUNT /boot/grub; SYSTEM MAY NOT BOOT")
-            raise Exception("UNABLE TO REMOUNT /boot/grub; FIX MANUALLY OR SYSTEM MAY NOT BOOT")
         cmd = "/sbin/umount"
         for dir in ["/dev", "/var/tmp"]:
             args = ["-f", mount_point + dir]
@@ -717,7 +682,7 @@ def UnmountClone(name, mount_point=None):
     return True
 
 
-def DeleteClone(name, delete_grub=False):
+def DeleteClone(name):
     # Delete the clone we created.
 
     _CheckBEName(name)
@@ -731,12 +696,6 @@ def DeleteClone(name, delete_grub=False):
     if rv is False:
         return rv
     
-    if delete_grub:
-        zfs = "/sbin/zfs"
-        args = ["destroy", _grub_snapshot(name)]
-        if RunCommand(zfs, args) is False:
-            log.debug("Unable to delete grub snapshot Pre-Upgrade-%s" % name)
-
     return rv
 
 
