@@ -306,14 +306,15 @@ def CloneSetAttr(clone, **kwargs):
     Currently only 'keep' (which maps to beadm:keep)
     is allowed.
     """
-    zfs = libzfs.ZFS()
     if clone is None:
         raise ValueError("Clone must be set")
     if kwargs is None:
         return True
 
+    dsname = "freenas-boot/ROOT/{0}".format(clone["realname"])
     try:
-        ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(clone["realname"]))
+        with libzfs.ZFS() as zfs:
+            ds = zfs.get_dataset(dsname)
     except:
         log.debug("Unable to find BE {0}".format(clone["realname"]), exc_info=True)
         return False
@@ -322,19 +323,23 @@ def CloneSetAttr(clone, **kwargs):
         if k == "keep":
             # This maps to zfs set beadm:keep=%s freenas-boot/ROOT/${bename}
             try:
-                if "beadm:keep" in ds.properties:
-                    ds.properties["beadm:keep"].value = str(v)
-                else:
-                    ds.properties["beadm:keep"] = libzfs.ZFSUserProperty(str(v))
+                with libzfs.ZFS() as zfs:
+                    ds = zfs.get_dataset(dsname)
+                    if "beadm:keep" in ds.properties:
+                        ds.properties["beadm:keep"].value = str(v)
+                    else:
+                        ds.properties["beadm:keep"] = libzfs.ZFSUserProperty(str(v))
             except:
                 log.debug("Unable to set beadm:keep value on BE {0}".format(clone["realname"]), exc_info=True)
                 return False
         elif k == "sync":
             try:
-                if v is None:
-                    ds.properties["sync"].inherit()
-                else:
-                    ds.properties["sync"].value = v
+                with libzfs.ZFS() as zfs:
+                    ds = zfs.get_dataset(dsname)
+                    if v is None:
+                        ds.properties["sync"].inherit()
+                    else:
+                        ds.properties["sync"].value = v
             except:
                 log.debug("Unable to set dataset sync value on BE {0} to {1}".
                           format(clone["realname"], str(v)), exc_info=True)
@@ -421,7 +426,6 @@ def ListClones():
     # "beadm list -H"; it then gets a set of properties
     # for each BE.
     # Because of that, it can't use RunCommand
-    zfs = libzfs.ZFS()
     cmd = [beadm, "list", "-H"]
     rv = []
     if debug:
@@ -453,16 +457,17 @@ def ListClones():
             'rawspace': None
         }
         try:
-            ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(tdict["realname"]))
-            tdict["rawspace"] = ds.properties["used"].rawvalue
-            try:
-                kstr = ds.properties["beadm:keep"].value
-                if kstr == "True":
-                    tdict["keep"] = True
-                elif kstr == "False":
-                    tdict["keep"] = False
-            except KeyError:
-                pass
+            with libzfs.ZFS() as zfs:
+                ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(tdict["realname"]))
+                tdict["rawspace"] = ds.properties["used"].rawvalue
+                try:
+                    kstr = ds.properties["beadm:keep"].value
+                    if kstr == "True":
+                        tdict["keep"] = True
+                    elif kstr == "False":
+                        tdict["keep"] = False
+                except KeyError:
+                    pass
         except libzfs.ZFSException:
             pass
         rv.append(tdict)
@@ -550,8 +555,8 @@ def CreateClone(name, bename=None, rename=None):
 
     # Let's see if the given name already exists
     try:
-        zfs = libzfs.ZFS()
-        x = zfs.get_dataset("freenas-boot/ROOT/{0}".format(name))
+        with libzfs.ZFS() as zfs:
+            zfs.get_dataset("freenas-boot/ROOT/{0}".format(name))
     except libzfs.ZFSException:
         pass
     else:

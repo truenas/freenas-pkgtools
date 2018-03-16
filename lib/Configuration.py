@@ -99,10 +99,11 @@ def CheckFreeSpace(path=None, pool=None, required=0):
             pool = mntpoint.source.split("/")[0]
             
     if pool:
-        p = libzfs.ZFS().get(pool)
-        pool_size = p.properties["size"].parsed
-        pool_used = p.properties["allocated"].parsed
-        pool_free = p.properties["free"].parsed
+        with libzfs.ZFS() as zfs:
+            p = zfs.get(pool)
+            pool_size = p.properties["size"].parsed
+            pool_used = p.properties["allocated"].parsed
+            pool_free = p.properties["free"].parsed
         pool_max = int(pool_size * (zfs_max_pct / 100.0))
         if (pool_used + required) >= pool_max:
             if pool_free > (zfs_multiple * required):
