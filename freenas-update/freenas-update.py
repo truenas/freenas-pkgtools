@@ -121,32 +121,6 @@ class UpdateHandler(object):
             self.update_progress(self.master_progress, self.details)
 
 
-def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
-    """
-    Extract the files in the given tarball into dest_dir.
-    This assumes dest_dir already exists.
-    """
-    with tarfile.open(tarball) as tf:
-        files = tf.getmembers()
-        for f in files:
-            if f.name in ("./", ".", "./."):
-                continue
-            if not f.name.startswith("./"):
-                if verbose:
-                    print("Illegal member {0}".format(f), file=sys.stderr)
-                continue
-            if len(f.name.split("/")) != 2:
-                if verbose:
-                    print("Illegal member name {0} has too many path components".format(f.name), file=sys.stderr)
-                continue
-            if verbose:
-                print("Extracting {0}".format(f.name), file=sys.stderr)
-            tf.extract(f.name, path=dest_dir)
-            if verbose:
-                print("Done extracting {0}".format(f.name), file=sys.stderr)
-    return True
-
-
 def PrintDifferences(diffs):
     for type in diffs:
         if type == "Packages":
@@ -463,17 +437,10 @@ where cmd is one of:
             sys.exit(1)
 
         try:
-            ExtractFrozenUpdate(args[0], cache_dir, verbose=verbose)
+            Update.ExtractFrozenUpdate(args[0], cache_dir, verbose=verbose)
         except BaseException as e:
             print("Unable to extract frozen update {0}: {1}".format(args[0], str(e)))
             sys.exit(1)
-        # Exciting!  Now we need to have a SEQUENCE file, or it will fail verification.
-        with open(os.path.join(cache_dir, "SEQUENCE"), "w") as s:
-            s.write(config.SystemManifest().Sequence())
-        # And now the SERVER file
-        with open(os.path.join(cache_dir, "SERVER"), "w") as s:
-            s.write(config.UpdateServerName())
-
         try:
             rv = DoUpdate(cache_dir, verbose, ignore_space=force, force_trampoline=force_trampoline)
         except:
