@@ -10,6 +10,7 @@ import random
 import shutil
 import fcntl
 import errno
+import tarfile
 
 try:
     import libzfs
@@ -27,7 +28,7 @@ from freenasOS.Exceptions import (
     UpdateIncompleteCacheException, UpdateInvalidCacheException, UpdateBusyCacheException,
     UpdateBootEnvironmentException, UpdatePackageException, UpdateSnapshotException,
     ManifestInvalidSignature, UpdateManifestNotFound, UpdateInsufficientSpace,
-    InvalidBootEnvironmentNameException,
+    InvalidBootEnvironmentNameException, UpdateBadFrozenFile,
 )
 
 log = logging.getLogger('freenasOS.Update')
@@ -1165,6 +1166,43 @@ def ServiceRestarts(directory):
                             retval.append(svc)
 
     return retval
+
+def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
+    """
+    Extract the files in the given tarball into dest_dir.
+    This assumes dest_dir already exists.
+    """
+    extracted = False
+    conf = Configuration.SystemConfiguration()
+    try:
+        with tarfile.open(tarball) as tf:
+            files = tf.getmembers()
+            for f in files:
+                if f.name in ("./", ".", "./."):
+                    continue
+                if not f.name.startswith("./"):
+                    if verbose:
+                        log.debug("Illegal member {0}".format(f))
+                    continue
+                if len(f.name.split("/")) != 2:
+                    if verbose:
+                        log.debug("Illegal member name {0} has too many path components".format(f.name))
+                    continue
+                if verbose:
+                    log.debug("Extracting {0}".format(f.name))
+                tf.extract(f.name, path=dest_dir)
+                extracted = True
+                if verbose:
+                    log.debug("Done extracting {0}".format(f.name))
+    except tarfile.TarError:
+        raise Exceptions.UpdateBadFrozenFile("Bad tar file {0}".format(tarball))
+    if extracted:
+        # We've extracted some files, and it may be an updated!
+        with open(os.path.join(dest_dir, "SEQUENCE"), "w") as s:
+            s.write(conf.SystemManifest().Sequence())
+        with open(os.path.join(dest_dir, "SERVER"), "w") as s:
+            s.write(conf.UpdateServerName())
+    return True
 
 
 def ApplyUpdate(directory,

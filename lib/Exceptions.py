@@ -17,6 +17,11 @@ class ManifestInvalidSignature(Exception):
 class UpdateException(Exception):
     pass
 
+class UpdateBadFrozenFile(Exception):
+    """
+    Indicates a frozen update file was bad
+    """
+    pass
 
 class UpdateInsufficientSpace(UpdateException):
     """Raised when there is insufficient space to download
