@@ -691,8 +691,11 @@ def UnmountClone(name, mount_point=None):
 def DeleteClone(name):
     # Delete the clone we created.
 
-    _CheckBEName(name)
-    
+    try:
+        _CheckBEName(name)
+    except InvalidBootEnvironmentNameException:
+        log.debug("Deleting BE with invalid name %s" % name)
+
     clone = FindClone(name)
     if clone is None:
         return False
