@@ -148,8 +148,9 @@ class SysLogHandler(logging.Handler):
             else:
                 _msg = msg[950 * i:950 * (i + 1)]
             syslog.syslog(
-                self.priority_names.get(record.levelname.lower(), "debug"),
-                _msg)
+                self.priority_names.get(record.levelname.lower(), syslog.LOG_DEBUG),
+                _msg
+            )
         syslog.closelog()
 
 
