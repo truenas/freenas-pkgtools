@@ -794,7 +794,7 @@ class Configuration(object):
                 return None
 
             try:
-                totalsize = int(furl.info().get('Content-Length').strip())
+                totalsize = read + int(furl.info().get('Content-Length').strip())
             except:
                 totalsize = None
 
