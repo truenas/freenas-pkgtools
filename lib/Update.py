@@ -460,7 +460,13 @@ def ListClones():
         try:
             with libzfs.ZFS() as zfs:
                 ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(tdict["realname"]))
-                tdict["rawspace"] = ds.properties["used"].rawvalue
+                tdict["rawspace"] = ds.properties["usedbydataset"].parsed + \
+                    ds.properties["usedbyrefreservation"].parsed + \
+                    ds.properties["usedbysnapshots"].parsed
+                origin = ds.properties["origin"].parsed
+                if '@' in origin:
+                    snapshot = zfs.get_snapshot(origin)
+                    tdict["rawspace"] += snapshot.properties["used"].parsed
                 try:
                     kstr = ds.properties["beadm:keep"].value
                     if kstr == "True":
