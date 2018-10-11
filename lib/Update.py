@@ -561,14 +561,14 @@ def CreateClone(name, bename=None, rename=None):
         args.append(name)
 
     # Let's see if the given name already exists
-    try:
-        with libzfs.ZFS() as zfs:
+    with libzfs.ZFS() as zfs:
+        try:
             zfs.get_dataset("freenas-boot/ROOT/{0}".format(name))
-    except libzfs.ZFSException:
-        pass
-    else:
-        raise KeyError
-    
+        except libzfs.ZFSException:
+            pass
+        else:
+            raise KeyError
+
     try:
         if os.path.exists(dsinit) and not RunCommand(dsinit, ["--lock"]):
             return False
