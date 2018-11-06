@@ -2,9 +2,13 @@
 from __future__ import print_function
 import sys
 import traceback
+from datetime import dateime
+
 
 sys.path.append("/usr/local/lib")
 from freenasOS import Configuration
+
+datenow = datetime.now().strftime("%c")
 
 if __name__ == '__main__':
     try:
@@ -14,6 +18,7 @@ if __name__ == '__main__':
         sys.exit(74)
 
     if error_flag or warn_flag:
+        print("Verify completed at %s" (datenow))
         print("The following inconsistencies were found in your current install:")
 
         if ed['checksum']:
@@ -38,5 +43,6 @@ if __name__ == '__main__':
         sys.exit(1)
 
     else:
+        print("Verify completed at %s" (datenow))
         print("All Files, Directories and Symlinks in the system were verified successfully")
         sys.exit(0)
