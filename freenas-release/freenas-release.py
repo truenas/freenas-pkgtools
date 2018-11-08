@@ -1,5 +1,4 @@
-#!/usr/bin/env /usr/local/bin/python
-from __future__ import print_function
+#!/usr/bin/env python3
 import os
 import sys
 import getopt
@@ -77,10 +76,7 @@ def SetConfiguration(path, project, arg_dict = {}):
     it is created; it may be an empty section.
     """
     # Just a raw config parser so we do no interpolation.
-    if sys.version_info[0] == 2:
-        import ConfigParser as configparser
-    else:
-        import configparser
+    import configparser
     cfp = configparser.RawConfigParser()
 
     try:
