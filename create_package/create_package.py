@@ -1,4 +1,4 @@
-#!/usr/bin/env /usr/local/bin/python
+#!/usr/bin/env python3
 # Create a pkgng-like package from a directory.
 from __future__ import print_function
 
@@ -12,10 +12,7 @@ import getopt
 import hashlib
 import io
 import fnmatch
-if sys.version_info[0] == 2:
-    import ConfigParser as configparser
-else:
-    import configparser
+import configparser
 
 
 debug = 0
