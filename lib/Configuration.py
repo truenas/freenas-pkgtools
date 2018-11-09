@@ -364,7 +364,9 @@ class PackageDB:
         cur = self.__conn.cursor()
 
         dir_list = []
-        cur.execute("SELECT path FROM files WHERE package = ? AND kind = ?", (pkgName, "dir"))
+        # Sort the list of directories in descending order, so that
+        # child directories get removed before their parents.
+        cur.execute("SELECT path FROM files WHERE package = ? AND kind = ? ORDER BY path DESC", (pkgName, "dir"))
         rows = cur.fetchall()
         for row in rows:
             path = row[0]
