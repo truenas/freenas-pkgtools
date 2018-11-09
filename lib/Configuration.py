@@ -12,7 +12,6 @@ import six
 
 import six.moves.configparser as configparser
 
-import requests
 from http.client import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
 
 from . import (
@@ -578,6 +577,8 @@ class Configuration(object):
     def TryGetNetworkFile(self, file=None, url=None, handler=None,
                           pathname=None, reason=None, intr_ok=False,
                           ignore_space=False):
+        # Lazy import requests to not require it on install
+        import requests
         AVATAR_VERSION = "X-%s-Manifest-Version" % Avatar()
         current_sequence = "unknown"
         current_train = None
