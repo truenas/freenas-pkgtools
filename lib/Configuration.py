@@ -11,16 +11,8 @@ import ssl
 import six
 
 import six.moves.configparser as configparser
-from six.moves.urllib.request import Request
-from six.moves.urllib.error import HTTPError, URLError
-from six.moves.urllib.request import Request, urlopen, HTTPSHandler
-from six.moves.urllib.request import build_opener
-from six.moves.http_client import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
-from six.moves.http_client import HTTPException, HTTPConnection, HTTPS_PORT
-if six.PY2:
-    from urllib2 import AbstractHTTPHandler
-elif six.PY3:
-    from urllib.request import AbstractHTTPHandler
+
+from http.client import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
 
 from . import (
     Avatar, UPDATE_SERVER, MASTER_UPDATE_SERVER, Exceptions,
@@ -133,92 +125,6 @@ def TryOpenFile(path):
         return None
     else:
         return f
-
-# This code taken from
-# http://stackoverflow.com/questions/1087227/validate-ssl-certificates-with-python
-
-
-class InvalidCertificateException(HTTPException, URLError):
-    def __init__(self, host, cert, reason):
-        HTTPException.__init__(self)
-        self.host = host
-        self.cert = cert
-        self.reason = reason
-
-    def __str__(self):
-        return ('Host %s returned an invalid certificate (%s) %s\n' %
-                (self.host, self.reason, self.cert))
-
-
-class CertValidatingHTTPSConnection(HTTPConnection):
-    default_port = HTTPS_PORT
-
-    def __init__(self, host, port=None, key_file=None, cert_file=None,
-                             ca_certs=None, strict=None, **kwargs):
-        if six.PY2:
-            HTTPConnection.__init__(self, host=host, port=port, strict=strict, **kwargs)
-        else:
-            # python3's HTTPConnection dropped the strict argument.
-            HTTPConnection.__init__(self, host=host, port=port, **kwargs)
-        self.key_file = key_file
-        self.cert_file = cert_file
-        self.ca_certs = ca_certs
-        if self.ca_certs:
-            self.cert_reqs = ssl.CERT_REQUIRED
-        else:
-            self.cert_reqs = ssl.CERT_NONE
-
-    def _GetValidHostsForCert(self, cert):
-        if 'subjectAltName' in cert:
-            return [x[1] for x in cert['subjectAltName'] if x[0].lower() == 'dns']
-        else:
-            return [x[0][1] for x in cert['subject'] if x[0][0].lower() == 'commonname']
-
-    def _ValidateCertificateHostname(self, cert, hostname):
-        import re
-        hosts = self._GetValidHostsForCert(cert)
-        for host in hosts:
-            host_re = host.replace('.', '\.').replace('*', '[^.]*')
-            if re.search('^%s$' % (host_re,), hostname, re.I):
-                return True
-        return False
-
-    def connect(self):
-        sock = socket.create_connection((self.host, self.port))
-        self.sock = ssl.wrap_socket(
-            sock,
-            keyfile=self.key_file,
-            certfile=self.cert_file,
-            cert_reqs=self.cert_reqs,
-            ca_certs=self.ca_certs
-        )
-        if self.cert_reqs & ssl.CERT_REQUIRED:
-            cert = self.sock.getpeercert()
-            hostname = self.host.split(':', 0)[0]
-            if not self._ValidateCertificateHostname(cert, hostname):
-                raise InvalidCertificateException(hostname, cert, 'hostname mismatch')
-
-
-class VerifiedHTTPSHandler(HTTPSHandler):
-    def __init__(self, **kwargs):
-        AbstractHTTPHandler.__init__(self)
-        self._connection_args = kwargs
-
-    def https_open(self, req):
-        def http_class_wrapper(host, **kwargs):
-            full_kwargs = dict(self._connection_args)
-            full_kwargs.update(kwargs)
-            return CertValidatingHTTPSConnection(host, **full_kwargs)
-
-        try:
-            return self.do_open(http_class_wrapper, req)
-        except URLError as e:
-            if type(e.reason) == ssl.SSLError and e.reason.args[0] == 1:
-                raise InvalidCertificateException(req.host, '', e.reason.args[1])
-            raise
-
-    https_request = HTTPSHandler.do_request_
-
 
 class PackageDB:
     DB_NAME = "data/pkgdb/freenas-db"
@@ -671,6 +577,8 @@ class Configuration(object):
     def TryGetNetworkFile(self, file=None, url=None, handler=None,
                           pathname=None, reason=None, intr_ok=False,
                           ignore_space=False):
+        # Lazy import requests to not require it on install
+        import requests
         AVATAR_VERSION = "X-%s-Manifest-Version" % Avatar()
         current_sequence = "unknown"
         current_train = None
@@ -737,31 +645,31 @@ class Configuration(object):
             for url in file_url:
                 url_exc = None
                 try:
-                    https_handler = VerifiedHTTPSHandler(ca_certs=DEFAULT_CA_FILE)
-                    opener = build_opener(https_handler)
-                    req = Request(url)
-                    req.add_header("X-iXSystems-Project", Avatar())
-                    req.add_header("X-iXSystems-Version", current_sequence)
+                    header_dict = {
+                        "X-iXSystems-Project" : Avatar(),
+                        "X-iXSystems-Version" : current_sequence,
+                        "User-Agent" : "%s=%s" % (AVATAR_VERSION, current_version)
+                    }
                     if current_version:
-                        req.add_header("X-iXSystems-Version-Name", current_version)
+                        header_dict["X-iXSystems-Version-Name"] = current_version
                     if current_train:
-                        req.add_header("X-iXSystems-Train", current_train)
+                        header_dict["X-iXSystems-Train"] = current_train
                     if host_id:
-                        req.add_header("X-iXSystems-HostID", host_id)
+                        header_dict["X-iXSystems-HostID"] = host_id
                     if reason:
-                        req.add_header("X-iXSystems-Reason", reason)
+                        header_dict["X-iXSystems-Reason"] = reason
                     if license_data:
-                        req.add_header("X-iXSystems-License", license_data)
+                        header_dict["X-iXSystems-License"] = license_data
 
-                    # Hack for debugging
-                    req.add_header("User-Agent", "%s=%s" % (AVATAR_VERSION, current_version))
                     # Allow restarting
                     if intr_ok:
-                        req.add_header("Range", "bytes=%d-" % read)
+                        header_dict["Range"] = "bytes=%d-" % read
 
-                    furl = opener.open(req, timeout=30)
-                except HTTPError as error:
-                    if error.code == HTTP_RANGE:
+                    furl = requests.get(url, timeout=10, verify=DEFAULT_CA_FILE,
+                                       stream=True, headers=header_dict)
+                    furl.raise_for_status()
+                except requests.exceptions.HTTPError as error:
+                    if error.response.status_code == HTTP_RANGE.value:
                         # We've reached the end of the file already
                         # Can I get this incorrectly from any other server?
                         # Do I need to do something different for the progress handler?
@@ -795,7 +703,7 @@ class Configuration(object):
                 return None
 
             try:
-                totalsize = read + int(furl.info().get('Content-Length').strip())
+                totalsize = read + int(furl.headers['Content-Length'].strip())
             except:
                 totalsize = None
 
@@ -812,7 +720,7 @@ class Configuration(object):
             lasttime = time.time()
             try:
                 while True:
-                    data = furl.read(chunk_size)
+                    data = furl.raw.read(chunk_size)
                     tmptime = time.time()
                     if tmptime - lasttime > 0:
                         downrate = int(chunk_size / (tmptime - lasttime))
