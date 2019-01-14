@@ -671,7 +671,7 @@ class Configuration(object):
                                        stream=True, headers=header_dict)
                     furl.raise_for_status()
                 except requests.exceptions.HTTPError as error:
-                    if error.status_code == HTTP_RANGE.value:
+                    if error.response.status_code == HTTP_RANGE.value:
                         # We've reached the end of the file already
                         # Can I get this incorrectly from any other server?
                         # Do I need to do something different for the progress handler?
