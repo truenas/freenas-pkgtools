@@ -844,6 +844,9 @@ def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None)
     else:
         try:
             new_manifest = conf.FindLatestManifest(train=train, require_signature=True)
+        except UpdateNetworkException as e:
+            log.error("Could not load latest manifest due to %s" % str(e))
+            raise e
         except Exception as e:
             log.error("Could not find latest manifest due to %s" % str(e))
 

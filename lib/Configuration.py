@@ -13,6 +13,7 @@ import six
 import six.moves.configparser as configparser
 
 from http.client import REQUESTED_RANGE_NOT_SATISFIABLE as HTTP_RANGE
+from http.client import NOT_FOUND as HTTP_NOT_FOUND
 
 from . import (
     Avatar, UPDATE_SERVER, MASTER_UPDATE_SERVER, Exceptions,
@@ -581,6 +582,8 @@ class Configuration(object):
                           ignore_space=False):
         # Lazy import requests to not require it on install
         import requests
+        import urllib3.exceptions
+
         AVATAR_VERSION = "X-%s-Manifest-Version" % Avatar()
         current_sequence = "unknown"
         current_train = None
@@ -677,8 +680,17 @@ class Configuration(object):
                         # Do I need to do something different for the progress handler?
                         retval.seek(0)
                         return retval
-                    log.error("Got http error %s" % str(error))
-                    url_exc = error
+                    elif error.response.status_code == HTTP_NOT_FOUND.value:
+                        # The requested file is not found on this server.
+                        url_exc = Exceptions.UpdateNetworkFileNotFoundException("Requested file %s not found" % (file if file else url))
+                        log.error("Error 404: %s" % str(url_exc))
+                    else:
+                        log.error("Got http error %s" % str(error))
+                        url_exc = Exceptions.UpdateNetworkServerException("Unable to load from url %s: %d" % (url, error.response.status_code))
+                        url_exc = error
+                except requests.exceptions.ConnectionError as e:
+                    log.error("Unable to connect to url %s: %s" % (url, str(e)))
+                    url_exc = Exceptions.UpdateNetworkConnectionException("Uable to connect to url %s" % url)
                 except BaseException as e:
                     log.error("Unable to load %s: %s", url, str(e))
                     url_exc = e

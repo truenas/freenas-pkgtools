@@ -17,6 +17,32 @@ class ManifestInvalidSignature(Exception):
 class UpdateException(Exception):
     pass
 
+class UpdateNetworkException(UpdateException):
+    """
+    Base class for a set of exceptions related to networking.
+    """
+    pass
+
+class UpdateNetworkFileNotFoundException(UpdateNetworkException):
+    """
+    This is a 404 error.
+    """
+    pass
+
+class UpdateNetworkServerException(UpdateNetworkException):
+    """
+    Generic network error.
+    """
+    pass
+
+class UpdateNetworkConnectionException(UpdateNetworkException):
+    """
+    Unable to connect to the server.  This covers a lot
+    of potential reasons, including a bad name (or nameserver),
+    or the server is not running the correct type of service.
+    """
+    pass
+
 class UpdateBadFrozenFile(Exception):
     """
     Indicates a frozen update file was bad
