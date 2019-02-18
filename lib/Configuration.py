@@ -686,7 +686,7 @@ class Configuration(object):
                         log.error("Error 404: %s" % str(url_exc))
                     else:
                         log.error("Got http error %s" % str(error))
-                        url_exc = Exceptions.UpdateNetworkServerException("Unable to load from url %s: " % (url, error.response.status_code))
+                        url_exc = Exceptions.UpdateNetworkServerException("Unable to load from url %s: %d" % (url, error.response.status_code))
                         url_exc = error
                 except requests.exceptions.ConnectionError as e:
                     log.error("Unable to connect to url %s: %s" % (url, str(e)))
