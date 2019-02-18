@@ -694,7 +694,6 @@ class Configuration(object):
                 except BaseException as e:
                     log.error("Unable to load %s, error class = %s" % (url, e.__class__))
                     log.error("Unable to load %s: %s", url, str(e))
-                    sys.exit(1)
                     url_exc = e
 
                 if furl:
