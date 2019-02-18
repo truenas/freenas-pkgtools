@@ -692,7 +692,6 @@ class Configuration(object):
                     log.error("Unable to connect to url %s: %s" % (url, str(e)))
                     url_exc = Exceptions.UpdateNetworkConnectionException("Uable to connect to url %s" % url)
                 except BaseException as e:
-                    log.error("Unable to load %s, error class = %s" % (url, e.__class__))
                     log.error("Unable to load %s: %s", url, str(e))
                     url_exc = e
 
