@@ -26,7 +26,7 @@ import freenasOS.Configuration as Configuration
 import freenasOS.Installer as Installer
 from freenasOS.Exceptions import (
     UpdateIncompleteCacheException, UpdateInvalidCacheException, UpdateBusyCacheException,
-    UpdateBootEnvironmentException, UpdatePackageException, UpdateSnapshotException,
+    UpdateBootEnvironmentException, UpdateNetworkException, UpdatePackageException, UpdateSnapshotException,
     ManifestInvalidSignature, UpdateManifestNotFound, UpdateInsufficientSpace,
     InvalidBootEnvironmentNameException, UpdateBadFrozenFile,
 )
