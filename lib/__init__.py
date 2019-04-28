@@ -16,10 +16,10 @@ import subprocess
 # Sef likes this line a lot.
 _os_type = "FreeNAS"
 UPDATE_SERVER = "https://update.ixsystems.com/" + _os_type
-MASTER_UPDATE_SERVER = "http://update-master.ixsystems.com/" + _os_type
+MASTER_UPDATE_SERVER = "https://update-master.ixsystems.com/" + _os_type
 
 # For signature verification
-IX_CRL = "http://update-master.ixsystems.com/updates/ix_crl.pem"
+IX_CRL = "https://update-master.ixsystems.com/updates/ix_crl.pem"
 DEFAULT_CA_FILE = "/usr/local/share/certs/ca-root-nss.crt"
 IX_ROOT_CA_FILE = "/usr/local/share/certs/iX-CA.pem"
 UPDATE_CERT_DIR = "/usr/local/share/certs"
@@ -34,7 +34,7 @@ try:
     from freenasUI.common.system import get_sw_name
     _os_type = get_sw_name()
     UPDATE_SERVER = "https://update.ixsystems.com/" + _os_type
-    MASTER_UPDATE_SERVER = "http://update-master.ixsystems.com/" + _os_type
+    MASTER_UPDATE_SERVER = "https://update-master.ixsystems.com/" + _os_type
 except:
     pass
 
