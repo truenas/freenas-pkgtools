@@ -690,7 +690,7 @@ class Configuration(object):
                         url_exc = error
                 except requests.exceptions.ConnectionError as e:
                     log.error("Unable to connect to url %s: %s" % (url, str(e)))
-                    url_exc = Exceptions.UpdateNetworkConnectionException("Uable to connect to url %s" % url)
+                    url_exc = Exceptions.UpdateNetworkConnectionException("Unable to connect to url %s" % url)
                 except BaseException as e:
                     log.error("Unable to load %s: %s", url, str(e))
                     url_exc = e
