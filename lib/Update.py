@@ -442,6 +442,12 @@ def ListClones():
         log.error("`%s' returned %d" % (cmd, p.returncode))
         return None
 
+    try:
+        with libzfs.ZFS() as zfs:
+            datasets_origin_list = [d.properties['origin'].parsed for d in zfs.datasets]
+    except libzfs.ZFSException:
+        datasets_origin_list = []
+
     for line in stdout.decode('utf8').strip('\n').split('\n'):
         fields = line.split('\t')
         name = fields[0]
@@ -460,13 +466,11 @@ def ListClones():
         try:
             with libzfs.ZFS() as zfs:
                 ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(tdict["realname"]))
-                tdict["rawspace"] = ds.properties["usedbydataset"].parsed + \
-                    ds.properties["usedbyrefreservation"].parsed + \
-                    ds.properties["usedbysnapshots"].parsed
                 origin = ds.properties["origin"].parsed
                 if '@' in origin:
                     snapshot = zfs.get_snapshot(origin)
-                    tdict["rawspace"] += snapshot.properties["used"].parsed
+                else:
+                    snapshot = None
                 try:
                     kstr = ds.properties["beadm:keep"].value
                     if kstr == "True":
@@ -475,8 +479,64 @@ def ListClones():
                         tdict["keep"] = False
                 except KeyError:
                     pass
+
+                # When a BE is deleted, following actions happen
+                # 1) It's descendants ( if any ) are promoted once
+                # 2) BE is deleted
+                # 3) Filesystems dependent on BE's origin are promoted
+                # 4) Origin is deleted
+                #
+                # Now we would like to find out the space which will be freed when a BE is removed.
+                # We classify a BE as of being 2 types,
+                # 1) BE without descendants
+                # 2) BE with descendants
+                #
+                # For (1), space freed is "usedbydataset" property and space freed by it's "origin".
+                # For (2), space freed is "usedbydataset" property and space freed by it's "origin" but this cannot
+                # actively determined because all the descendants are promoted once for this BE and at the end origin
+                # of current BE would be determined by last descendant promoted. So we ignore this for now and rely
+                # only on the space it is currently consuming as a best effort to predict.
+                # There is also "usedbysnaps" property, for that we will retrieve all snapshots of the dataset,
+                # find if any of them do not have a dataset cloned, that space will also be freed when we delete
+                # this dataset. And we will also factor in the space consumed by children.
+
+                tdict['rawspace'] = ds.properties['usedbydataset'].parsed + ds.properties['usedbychildren'].parsed
+                ds_snaps = list(ds.snapshots)
+
+                children = False
+                for snap in ds_snaps:
+                    if snap.name not in datasets_origin_list:
+                        tdict['rawspace'] += snap.properties['used'].parsed
+                    else:
+                        children = True
+
+                if snapshot and not children:
+                    # This indicates the current BE is a leaf and it is safe to add the BE's origin
+                    # space to the space freed when it is deleted.
+                    tdict['rawspace'] += snapshot.properties['used'].parsed
+
         except libzfs.ZFSException:
             pass
+        else:
+            if tdict['rawspace'] < 1024:
+                tdict['space'] = f'{tdict["rawspace"]}B'
+            elif 1024 <= tdict['rawspace'] < 1048576:
+                tdict['space'] = f'{tdict["rawspace"]/1024}K'
+            elif 1048576 <= tdict['rawspace'] < 1073741824:
+                tdict['space'] = f'{tdict["rawspace"]/1048576}M'
+            elif 1073741824 <= tdict['rawspace'] < 1099511627776:
+                tdict['space'] = f'{tdict["rawspace"]/1073741824}G'
+            elif 1099511627776 <= tdict['rawspace'] < 1125899906842624:
+                tdict['space'] = f'{tdict["rawspace"]/1099511627776}T'
+            elif 1125899906842624 <= tdict['rawspace'] < 1152921504606846976:
+                tdict['space'] = f'{tdict["rawspace"]/1125899906842624}P'
+            elif 1152921504606846976 <= tdict['rawspace'] < 1152921504606846976:
+                tdict['space'] = f'{tdict["rawspace"]/1152921504606846976}E'
+            else:
+                tdict['space'] = f'{tdict["rawspace"]/1152921504606846976}Z'
+
+            tdict['space'] = f'{round(float(tdict["space"][:-1]), 2)}{tdict["space"][-1]}'
+
         rv.append(tdict)
     return rv
 
