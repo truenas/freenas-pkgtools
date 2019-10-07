@@ -7,10 +7,8 @@ import sys
 import re
 import json
 import subprocess
-import tarfile
 import getopt
 import hashlib
-import io
 import fnmatch
 import configparser
 
@@ -419,42 +417,50 @@ def main():
     if debug > 1:
         print(manifest_string)
 
-    # I would LOVE to be able to use xz, but python's tarfile does not
-    # (as of when I write this) support it.  Python 3 has it.
+    tar_cmd = ['/usr/bin/tar']
     if os.path.exists(PIGZ_PATH):
-        outfile = open(output, "wb")
-        pigz = subprocess.Popen([PIGZ_PATH], bufsize=1024*1024,
-                             stdin=subprocess.PIPE, stdout=outfile)
-        tf = tarfile.open(fileobj=pigz.stdin, mode="w|", format=tarfile.PAX_FORMAT)
-    else:
-        tf = tarfile.open(output, "w:gz", format=tarfile.PAX_FORMAT)
-        pigz = None
-        
+        tar_cmd.append('--use-compress-program="pigz --best --recursive"')
+
+    tar_cmd.extend(['-C', root, '-czvnpf', f'"{output}"', '--format', 'pax'])
+
     # Add the manifest string as the file "+MANIFEST"
-    mani_file_info = tarfile.TarInfo(name="+MANIFEST")
-    mani_file_info.size = len(manifest_string)
-    mani_file_info.mode = 0o600
-    mani_file_info.type = tarfile.REGTYPE
-    mani_file = io.BytesIO(manifest_string.encode('utf8'))
-    tf.addfile(mani_file_info, mani_file)
+    manifest_file_path = os.path.join(root, '+MANIFEST')
+    list_of_files_path = os.path.join(root, 'list_of_files')
+    with open(manifest_file_path, 'wb') as f:
+        f.write(manifest_string.encode('utf8'))
+
+    os.chmod(manifest_file_path, 0o600)
+
+    specs = ['+MANIFEST']
     # Now add all of the files
     for file in sorted(manifest["files"]):
         if verbose or debug > 0:
             print("Adding file %s to archive" % file, file=sys.stderr)
-        tf.add(root + file, arcname=file, recursive=False)
+        specs.append(file.lstrip('/'))
+
     # And now the directories
     for dir in sorted(manifest["directories"]):
         if verbose or debug > 0:
             print("Adding directory %s to archive" % dir, file=sys.stderr)
-        tf.add(root + dir, arcname=dir, recursive=False)
+        specs.append(dir.lstrip('/'))
 
-    tf.close()
-    if pigz:
-        print("Waiting for pigz to finish", file=sys.stderr)
-        pigz.stdin.close()
-        pigz.wait()
-        
+    with open(list_of_files_path, 'w') as f:
+        f.write('\n'.join(specs))
+
+    tar_cmd.extend(['-T', list_of_files_path])
+
+    cp = subprocess.Popen(' '.join(tar_cmd), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = cp.communicate()
+    if cp.returncode:
+        print(f'Failed packaging {output}: {stderr}')
+        return cp.returncode
+
+    for f in (list_of_files_path, manifest_file_path):
+        if os.path.exists(f):
+            os.unlink(f)
+
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
