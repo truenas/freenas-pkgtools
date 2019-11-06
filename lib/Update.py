@@ -241,7 +241,15 @@ def StartServices(svc_list):
 # Used by the clone functions below
 beadm = "/usr/local/sbin/beadm"
 dsinit = "/usr/local/sbin/dsinit"
-freenas_pool = "freenas-boot"
+all_pools = subprocess.run(
+    ['zpool', 'list', '-H', '-o', 'name'], capture_output=True, text=True
+).stdout
+if "freenas-boot\n" in all_pools:
+    freenas_pool = "freenas-boot"
+elif "boot-pool\n" in all_pools:
+    freenas_pool = "boot-pool"
+else:
+    freenas_pool = None
 
 def RunCommand(command, args):
     # Run the given command.  Uses subprocess module.
@@ -312,7 +320,7 @@ def CloneSetAttr(clone, **kwargs):
     if kwargs is None:
         return True
 
-    dsname = "freenas-boot/ROOT/{0}".format(clone["realname"])
+    dsname = "{0}/ROOT/{1}".format(freenas_pool, clone["realname"])
     try:
         with libzfs.ZFS() as zfs:
             ds = zfs.get_dataset(dsname)
@@ -465,7 +473,7 @@ def ListClones():
         }
         try:
             with libzfs.ZFS() as zfs:
-                ds = zfs.get_dataset("freenas-boot/ROOT/{0}".format(tdict["realname"]))
+                ds = zfs.get_dataset("{}/ROOT/{}".format(freenas_pool, tdict["realname"]))
                 origin = ds.properties["origin"].parsed
                 if '@' in origin:
                     snapshot = zfs.get_snapshot(origin)
@@ -623,7 +631,7 @@ def CreateClone(name, bename=None, rename=None):
     # Let's see if the given name already exists
     with libzfs.ZFS() as zfs:
         try:
-            zfs.get_dataset("freenas-boot/ROOT/{0}".format(name))
+            zfs.get_dataset("{}/ROOT/{}".format(freenas_pool, name))
         except libzfs.ZFSException:
             pass
         else:
@@ -1502,7 +1510,7 @@ def ApplyUpdate(directory,
             RunCommand(cmd, args)
             # And set the beadm:nickname property back
             args = ["set", "beadm:nickname=%s" % root_env["name"],
-                    "freenas-boot/ROOT/{0}".format(root_env["realname"])]
+                    "{}/ROOT/{}".format(freenas_pool, root_env["realname"])]
 
             RunCommand(cmd, args)
 
@@ -1614,7 +1622,7 @@ def ApplyUpdate(directory,
                     if rv is False:
                         log.error("Unable to rollback %s" % snapshot_name)
                         # Don't know what to do then
-                    args = ["set", "beadm:nickname=%s" % root_env["name"], "freenas-boot/ROOT/%s" % root_env["name"]]
+                    args = ["set", "beadm:nickname=%s" % root_env["name"], "{}/ROOT/{}".format(freenas_pool, root_env["name"])]
                     rv = RunCommand(cmd, args)
                     if rv is False:
                         log.error("Unable to set nickname, wonder what I did wrong")
