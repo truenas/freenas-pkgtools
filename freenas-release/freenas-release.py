@@ -1652,7 +1652,7 @@ def AddPackage(pkg, db = None,
                 # the updates for those, if any.  Create delta packages as
                 # necessary?
                 with open(pkg_file, "rb") as src:
-                    with open(pkg_dest_file, "wxb") as dst:
+                    with open(pkg_dest_file, "wb") as dst:
                         kBufSize = 1024 * 1024
                         while True:
                             buffer = src.read(kBufSize)
@@ -1713,7 +1713,7 @@ def AddPackage(pkg, db = None,
                 # We use this to add to the database, later on.
                 if restart_services:
                     service_list = restart_services.copy()
-                print("After rpuning: restart_services = %s" % restart_services, file=sys.stderr)
+                print("After running: restart_services = %s" % restart_services, file=sys.stderr)
                 
                 # Note that we are doing this before adding the new package to
                 # the database, although that's not strictly necessary.  (But
@@ -2017,8 +2017,9 @@ def ProcessRelease(source, archive,
     
     if debug:  print("Processelease(%s, %s, %s, %s)" % (source, archive, db, sign), file=sys.stderr)
 
-    if db is None:
-        raise Exception("Invalid db")
+    #if db is None:
+    #    raise Exception("Invalid db")
+   
 
     pkg_source_dir = "%s/Packages" % source
     pkg_dest_dir = "%s/Packages" % archive
@@ -2043,10 +2044,11 @@ def ProcessRelease(source, archive,
             pass
     
     # Add any validation scripts
-    for (name, kind) in [("ValidateInstall", Manifest.VALIDATE_INSTALL),
-                         ("ValidateUpdate", Manifest.VALIDATE_UPDATE)]:
-        if os.path.exists(os.path.join(source, name)):
-            AddValidationScript(db, archive, manifest, os.path.join(source, name), kind)
+    if db is not None:
+        for (name, kind) in [("ValidateInstall", Manifest.VALIDATE_INSTALL),
+                           ("ValidateUpdate", Manifest.VALIDATE_UPDATE)]:
+            if os.path.exists(os.path.join(source, name)):
+                AddValidationScript(db, archive, manifest, os.path.join(source, name), kind)
     
     try:
         service_file = open(os.path.join(source, "RESTART"), "r")
@@ -2095,7 +2097,7 @@ def ProcessRelease(source, archive,
             print("Due to conflict, trying sequence %s" % name, file=sys.stderr)
         new_mani_path = "%s/%s/%s-%s" % (archive, manifest.Train(), project, name)
         try:
-            mani_file = open(new_mani_path, "wxb", 0o622)
+            mani_file = open(new_mani_path, "xb", 0o622)
             break
         except (IOError, OSError) as e:
             import errno
@@ -2121,34 +2123,35 @@ def ProcessRelease(source, archive,
     manifest.SetSequence(name)
 
     # Okay, let's see if this train has any prior entries in the database
-    previous_sequences = db.RecentSequencesForTrain(manifest.Train())
+    if db is not None:
+        previous_sequences = db.RecentSequencesForTrain(manifest.Train())
 
-    pkg_list = []
-    delta_scripts = {}
-    for pkg in manifest.Packages():
-        lock = LockArchive(archive, "Processing package %s-%s" % (pkg.Name(), pkg.Version()), wait = True)
-        print("Package %s, version %s, filename %s" % (pkg.Name(), pkg.Version(), pkg.FileName()), file=sys.stderr)
-        # Some setup for the AddPackage function
-        script_path = os.path.join(pkg_source_dir, pkg.Name())
-        scripts = {}
-        if os.path.isdir(script_path):
-            for script_name in os.listdir(script_path):
-                scripts[script_name] = open(os.path.join(script_path, script_name), "r").read()
-        if len(scripts) == 0:
-            scripts = None
-        pkg = AddPackage(pkg, db,
-                         source = pkg_source_dir,
-                         archive = archive,
-                         train = manifest.Train(),
-                         scripts = scripts,
-                         fail_on_error = False,
-                         restart_services = services,
-                         delta_count=delta_count,
-                         )
+        pkg_list = []
+        delta_scripts = {}
+        for pkg in manifest.Packages():
+            lock = LockArchive(archive, "Processing package %s-%s" % (pkg.Name(), pkg.Version()), wait = True)
+            print("Package %s, version %s, filename %s" % (pkg.Name(), pkg.Version(), pkg.FileName()), file=sys.stderr)
+            # Some setup for the AddPackage function
+            script_path = os.path.join(pkg_source_dir, pkg.Name())
+            scripts = {}
+            if os.path.isdir(script_path):
+                for script_name in os.listdir(script_path):
+                    scripts[script_name] = open(os.path.join(script_path, script_name), "r").read()
+            if len(scripts) == 0:
+                scripts = None
+            pkg = AddPackage(pkg, db,
+                             source = pkg_source_dir,
+                             archive = archive,
+                             train = manifest.Train(),
+                             scripts = scripts,
+                             fail_on_error = False,
+                             restart_services = services,
+                             delta_count=delta_count,
+                             )
 
-        # Unlock the archive now
-        lock.close()
-        pkg_list.append(pkg)
+            # Unlock the archive now
+            lock.close()
+            pkg_list.append(pkg)
         
     # Now let's go over the possible notes.
     # Right now, we only support three:
@@ -2183,7 +2186,7 @@ def ProcessRelease(source, archive,
                                                     delete = False)
             if debug or verbose:
                 print("Created notes file %s for note %s" % (note_file.name, note_name), file=sys.stderr)
-            note_file.write(notes[note_name])
+            note_file.write(notes[note_name].encode('utf8'))
             os.chmod(note_file.name, 0o664)
             manifest.SetNote(note_name, os.path.basename(note_file.name))
         except OSError as e:
@@ -2229,7 +2232,7 @@ def ProcessRelease(source, archive,
         if change_input:
             lock = LockArchive(archive, "Modifying ChangeLog", wait = True)
             try:
-                cfile = open(changefile, "ab", 0o664)
+                cfile = open(changefile, "a", 0o664)
             except:
                 print("Unable to open changelog %s" % changefile, file=sys.stderr)
             else:
@@ -2240,7 +2243,6 @@ def ProcessRelease(source, archive,
             lock.close()
             
     if db is not None:
-        # Why would it ever be none?
         db.AddRelease(manifest)
 
 def Check(archive, db, project = "FreeNAS", args = []):
@@ -2681,7 +2683,7 @@ def Rebuild(archive, dbfile, project = "FreeNAS", key = None, args = []):
                 manifest_path = os.path.join(copy, m.Train(), "%s-%s" % (project, name))
                 print("%s" % manifest_path, file=sys.stderr)
                 try:
-                    manifest_file = open(manifest_path, "wxb", 0o664)
+                    manifest_file = open(manifest_path, "Wb", 0o664)
                 except OSError as e:
                     # Should compare manifests, perhaps
                     print("Cannot open %s: %s" % (manifest_path, str(e)), file=sys.stderr)
@@ -2955,7 +2957,7 @@ def RemoveRelease(archive, db, project, sequence, dbonly = False, shlist = None)
         # (We can't remove the db entry for the package if there are
         # any updates that reference it, because we want it to show up
         # for delta package creation.)
-	packages_dir = os.path.join(archive, "Packages")
+        packages_dir = os.path.join(archive, "Packages")
         updates = db.UpdatesForPackage(pkg, count = 0)
         if updates:
             # We're going to delete the delta package files
