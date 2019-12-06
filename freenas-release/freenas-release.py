@@ -2017,8 +2017,6 @@ def ProcessRelease(source, archive,
     
     if debug:  print("Processelease(%s, %s, %s, %s)" % (source, archive, db, sign), file=sys.stderr)
 
-    #if db is None:
-    #    raise Exception("Invalid db")
    
 
     pkg_source_dir = "%s/Packages" % source
@@ -2122,37 +2120,6 @@ def ProcessRelease(source, archive,
     lock.close()
     manifest.SetSequence(name)
 
-    # Okay, let's see if this train has any prior entries in the database
-    if db is not None:
-        previous_sequences = db.RecentSequencesForTrain(manifest.Train())
-
-        pkg_list = []
-        delta_scripts = {}
-        for pkg in manifest.Packages():
-            lock = LockArchive(archive, "Processing package %s-%s" % (pkg.Name(), pkg.Version()), wait = True)
-            print("Package %s, version %s, filename %s" % (pkg.Name(), pkg.Version(), pkg.FileName()), file=sys.stderr)
-            # Some setup for the AddPackage function
-            script_path = os.path.join(pkg_source_dir, pkg.Name())
-            scripts = {}
-            if os.path.isdir(script_path):
-                for script_name in os.listdir(script_path):
-                    scripts[script_name] = open(os.path.join(script_path, script_name), "r").read()
-            if len(scripts) == 0:
-                scripts = None
-            pkg = AddPackage(pkg, db,
-                             source = pkg_source_dir,
-                             archive = archive,
-                             train = manifest.Train(),
-                             scripts = scripts,
-                             fail_on_error = False,
-                             restart_services = services,
-                             delta_count=delta_count,
-                             )
-
-            # Unlock the archive now
-            lock.close()
-            pkg_list.append(pkg)
-        
     # Now let's go over the possible notes.
     # Right now, we only support three:
     # ReleaseNotes, ChangeLog, and NOTICE.
@@ -2217,33 +2184,6 @@ def ProcessRelease(source, archive,
     lock = LockArchive(archive, "Creating LATEST symlink", wait = True)
     MakeLATEST(archive, project, manifest.Train(), manifest.Sequence())
     lock.close()
-    
-    if changelog:
-        changefile = "%s/%s/ChangeLog.txt" % (archive, manifest.Train())
-        change_input = None
-        if changelog == "-":
-            print("Enter changelog, control-d when done")
-            change_input = sys.stdin
-        else:
-            try:
-                change_input = open(changelog, "r")
-            except:
-                print("Unable to open input change log %s" % changelog, file=sys.stderr)
-        if change_input:
-            lock = LockArchive(archive, "Modifying ChangeLog", wait = True)
-            try:
-                cfile = open(changefile, "a", 0o664)
-            except:
-                print("Unable to open changelog %s" % changefile, file=sys.stderr)
-            else:
-                cfile.write("### START %s\n" % manifest.Sequence())
-                cfile.write(change_input.read())
-                cfile.write("\n### END %s\n" % manifest.Sequence())
-                cfile.close()
-            lock.close()
-            
-    if db is not None:
-        db.AddRelease(manifest)
 
 def Check(archive, db, project = "FreeNAS", args = []):
     """
