@@ -14,7 +14,7 @@ import subprocess
 # platform-specific stuff.
 
 # Sef likes this line a lot.
-_os_type = "FreeNAS"
+_os_type = "TrueNAS"
 UPDATE_SERVER = "https://update.ixsystems.com/" + _os_type
 MASTER_UPDATE_SERVER = "https://update-master.ixsystems.com/" + _os_type
 
@@ -27,16 +27,6 @@ UPDATE_CERT_PRODUCTION = UPDATE_CERT_DIR + "/Production.pem"
 UPDATE_CERT_NIGHTLIES = UPDATE_CERT_DIR + "/Nightlies.pem"
 VERIFIER_HELPER = "/usr/local/libexec/verify_signature"
 SIGNATURE_FAILURE = True
-
-# TODO: Add FN10's equivalent of get_sw_name (for TN10 when applicable)
-try:
-    sys.path.append("/usr/local/www")
-    from freenasUI.common.system import get_sw_name
-    _os_type = get_sw_name()
-    UPDATE_SERVER = "https://update.ixsystems.com/" + _os_type
-    MASTER_UPDATE_SERVER = "https://update-master.ixsystems.com/" + _os_type
-except:
-    pass
 
 
 def Avatar():
