@@ -261,7 +261,7 @@ def main():
     global log
 
     def usage():
-        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [--server|-S server][-B|--trampline yes|no] [--force|-F] [-v] <cmd>
+        print("""Usage: {0} [-C cache_dir] [-d] [-T train] [--no-delta] [--reboot|-R] [--server|-S server][-B|--trampoline yes|no] [--force|-F] [-v] <cmd>
 or	{0} <update_tar_file>
 where cmd is one of:
         check\tCheck for updates
