@@ -1396,7 +1396,7 @@ def ApplyUpdate(directory,
             pass
         
     if not ignore_space and not PruneClones(required=space_needed):
-        raise UpdateInsufficientSpace("Insufficent space to install update")
+        raise UpdateInsufficientSpace("Insufficient space to install update")
     
     mount_point = None
     if reboot:
