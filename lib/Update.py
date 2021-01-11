@@ -872,7 +872,8 @@ def GetUpdateChanges(old_manifest, new_manifest, cache_dir=None):
     return diffs
 
 
-def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None):
+def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None, enterprise=False,
+                    system_uuid=None):
     """
     Check for an updated manifest.  If cache_dir is none, then we try
     to download just the latest manifest for the given train, and
@@ -911,7 +912,8 @@ def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None)
                 raise e
     else:
         try:
-            new_manifest = conf.FindLatestManifest(train=train, require_signature=True)
+            new_manifest = conf.FindLatestManifest(train=train, require_signature=True, enterprise=enterprise,
+                                                   system_uuid=system_uuid)
         except UpdateNetworkException as e:
             log.error("Could not load latest manifest due to %s" % str(e))
             raise e
@@ -949,7 +951,7 @@ def CheckForUpdates(handler=None, train=None, cache_dir=None, diff_handler=None)
 
 def DownloadUpdate(train, directory, get_handler=None,
                    check_handler=None, pkg_type=None,
-                   ignore_space=False):
+                   ignore_space=False, enterprise=False, system_uuid=None):
     """
     Download, if necessary, the LATEST update for train; download
     delta packages if possible.  Checks to see if the existing content
@@ -966,7 +968,8 @@ def DownloadUpdate(train, directory, get_handler=None,
     mani = conf.SystemManifest()
     # First thing, let's get the latest manifest
     try:
-        latest_mani = conf.FindLatestManifest(train, require_signature=True)
+        latest_mani = conf.FindLatestManifest(train, require_signature=True, enterprise=enterprise,
+                                              system_uuid=system_uuid)
     except ManifestInvalidSignature as e:
         log.error("Latest manifest has invalid signature: %s" % str(e))
         raise e

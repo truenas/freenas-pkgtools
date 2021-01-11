@@ -6,6 +6,8 @@ import sys
 import tarfile
 import shutil
 
+from middlewared.client import Client
+
 sys.path.append("/usr/local/lib")
 
 import freenasOS.Configuration as Configuration
@@ -150,7 +152,7 @@ def PrintDifferences(diffs):
             print("*** Unknown key {0} (value {1})".format(type, str(diffs[type])), file=sys.stderrr)
 
 
-def DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=False):
+def DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=False, enterprise=False, system_uuid=None):
 
     try:
         if not verbose:
@@ -162,11 +164,14 @@ def DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=False):
                     get_handler=handler.get_handler,
                     check_handler=handler.check_handler,
                     pkg_type=pkg_type,
+                    enterprise=enterprise,
+                    system_uuid=system_uuid,
                 )
                 if rv is False:
                     progress_bar.update(message="No updates available")
         else:
-            rv = Update.DownloadUpdate(train, cache_dir, pkg_type=pkg_type, ignore_space=ignore_space)
+            rv = Update.DownloadUpdate(train, cache_dir, pkg_type=pkg_type, ignore_space=ignore_space,
+                                       enterprise=enterprise, system_uuid=system_uuid)
     except Exceptions.ManifestInvalidSignature:
         log.error("Manifest has invalid signature")
         print("Manifest has invalid signature", file=sys.stderr)
@@ -345,6 +350,14 @@ where cmd is one of:
     if len(args) != 1:
         usage()
 
+    trains_kwargs = {}
+    try:
+        with Client() as c:
+            trains_kwargs = c.call('update.trains_kwargs')
+    except Exception as e:
+        print("WARNING: %r" % e)
+        print("WARNING: Using LATEST manifest")
+
     if args[0] == "check":
         # To see if we have an update available, we
         # call Update.DownloadUpdate.  If we have been
@@ -352,7 +365,7 @@ where cmd is one of:
         # we make a temporary directory and use that.  We
         # have to clean up afterwards in that case.
 
-        rv = DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=force)
+        rv = DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=force, **trains_kwargs)
         if rv is False:
             if verbose:
                 print("No updates available")
@@ -393,7 +406,7 @@ where cmd is one of:
             raise
 
         if do_download:
-            rv = DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=force)
+            rv = DoDownload(train, cache_dir, pkg_type, verbose, ignore_space=force, **trains_kwargs)
             if rv is False:
                 if verbose:
                     print("No updates available")

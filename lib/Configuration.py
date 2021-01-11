@@ -776,7 +776,7 @@ class Configuration(object):
     # The file is a JSON file.
     # This sets self._trains as a dictionary of
     # Train objects (key being the train name).
-    def LoadTrainsConfig(self, updatecheck=False):
+    def LoadTrainsConfig(self, updatecheck=False, enterprise=False, system_uuid=None):
         import json
         self._trains = {}
         if self._temp:
@@ -801,7 +801,7 @@ class Configuration(object):
             self._trains[temp.Name()] = temp
         if updatecheck:
             for train in self._trains:
-                new_man = self.FindLatestManifest(train.Name())
+                new_man = self.FindLatestManifest(train.Name(), enterprise=enterprise, system_uuid=system_uuid)
                 if new_man:
                     if new_man.Sequence() != train.LastSequence():
                         # We have an update
@@ -1084,7 +1084,7 @@ class Configuration(object):
                                           reason="GetManifest")
         return file_ref
 
-    def FindLatestManifest(self, train=None, require_signature=False):
+    def FindLatestManifest(self, train=None, require_signature=False, enterprise=False, system_uuid=None):
         # Gets <UPDATE_SERVER>/<train>/LATEST
         # Returns a manifest, or None.
         rv = None
@@ -1100,9 +1100,44 @@ class Configuration(object):
             else:
                 train = temp_mani.Train()
 
-        mani_file = self.TryGetNetworkFile(url="%s/%s/LATEST" % (self.UpdateServerMaster(), train),
-                                      reason="GetLatestManifest",
-                                      )
+        if not enterprise:
+            stable_file = "STABLE"
+            latest_file = "LATEST"
+        else:
+            stable_file = "STABLE-ENTERPRISE"
+            latest_file = "LATEST-ENTERPRISE"
+
+        if system_uuid is not None:
+            mani_file = self.TryGetNetworkFile(url="%s/%s/%s" % (self.UpdateServerMaster(), train, stable_file),
+                                               reason="GetLatestManifest")
+            if mani_file is None:
+                log.debug("Could not get latest manifest file for train %s" % train)
+                return None
+
+            rv = Manifest.Manifest(self, require_signature=require_signature)
+            rv.LoadFile(mani_file)
+            mani_file.close()
+
+            update_rate = rv.dict().get("rate")
+            # update_rate = 0: `latest` version is not ready, always using `stable` version
+            # update_rate = 10: 10% of systems will receive `latest` version
+            # update_rate = 100 (or None): All systems will use `latest` version
+            if update_rate is not None:
+                if os.path.exists("/data/force-update"):
+                    rate = -1
+                else:
+                    rate = int(hashlib.sha1((system_uuid + rv.Version()).encode()).hexdigest(), 16) % 100
+
+                if rate < update_rate:
+                    log.debug("Accepting an update with a rate=%d for a system with a rate=%d", update_rate, rate)
+                else:
+                    log.debug("Not accepting an update with a rate=%d for a system with a rate=%d", update_rate, rate)
+                    return rv
+            else:
+                log.debug("Unconditionally accepting an update without a rate")
+
+        mani_file = self.TryGetNetworkFile(url="%s/%s/%s" % (self.UpdateServerMaster(), train, latest_file),
+                                           reason="GetLatestManifest")
         if mani_file is None:
             log.debug("Could not get latest manifest file for train %s" % train)
         else:
