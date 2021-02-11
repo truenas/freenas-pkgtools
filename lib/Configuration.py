@@ -1223,7 +1223,7 @@ class Configuration(object):
                             if h == search_attempt["Checksum"]:
                                 return file
                             else:
-                                pkg_exception = Exceptions.ChecksumFailException("%{0} has invalid checksum".format(search_attempt["Filename"]))
+                                pkg_exception = Exceptions.ChecksumFailException("%{0} has invalid checksum: Expected {1} Got {2}".format(search_attempt["Filename"], search_attempt["Checksum"], h))
                         else:
                             # No checksum for the file, so we'll just go with it.
                             return file
@@ -1262,7 +1262,7 @@ class Configuration(object):
                         log.debug("Checksum doesn't match, removing file")
                         if save_name:
                             os.unlink(save_name)
-                        pkg_exception = Exceptions.ChecksumFailException("%{0} has invalid checksum".format(pFile))
+                        pkg_exception = Exceptions.ChecksumFailException("%{0} has invalid checksum: Expected {1} Got {2}".format(pFile, search_attempt["Checksum"], h))
                 else:
                     # No checksum for the file, so we just go with it
                     return file
