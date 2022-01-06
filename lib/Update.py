@@ -1275,7 +1275,7 @@ def ExtractFrozenUpdate(tarball, dest_dir, verbose=False):
                 if verbose:
                     log.debug("Done extracting {0}".format(f.name))
     except tarfile.TarError:
-        raise Exceptions.UpdateBadFrozenFile("Bad tar file {0}".format(tarball))
+        raise UpdateBadFrozenFile("Bad tar file {0}".format(tarball))
     if extracted:
         # We've extracted some files, and it may be an updated!
         with open(os.path.join(dest_dir, "SEQUENCE"), "w") as s:
