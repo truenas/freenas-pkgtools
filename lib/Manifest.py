@@ -679,7 +679,8 @@ class Manifest(object):
         valid_script = os.path.join(".", os.path.basename(prog_path))
         
         try:
-            subprocess.check_output(valid_script, preexec_fn=PreExecHook, stderr=subprocess.STDOUT)
+            subprocess.check_output(valid_script, preexec_fn=PreExecHook, stderr=subprocess.STDOUT, encoding="utf-8",
+                                    errors="ignore")
         except subprocess.CalledProcessError as err:
             raise Exceptions.UpdateInvalidUpdateException(err.output.rstrip())
         finally:
