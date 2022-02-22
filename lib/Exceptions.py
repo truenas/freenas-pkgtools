@@ -58,7 +58,7 @@ class UpdateInsufficientSpace(UpdateException):
     def __init__(self, value=""):
         self.value = value
     def __str__(self):
-        return repr(self.value)
+        return self.value
     
 class UpdateInvalidUpdateException(UpdateException):
     """Raised when a package validation script fails.
@@ -68,7 +68,7 @@ class UpdateInvalidUpdateException(UpdateException):
     def __init__(self, value=""):
         self.value = value
     def __str__(self):
-        return repr(self.value)
+        return self.value
 
 class UpdateIncompleteCacheException(UpdateException):
     pass
